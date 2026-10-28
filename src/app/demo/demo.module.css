@@ -12,8 +12,8 @@
 .top { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
 .brand { font-weight: 700; font-size: 1.2rem; text-decoration: none; }
 .badge { color: var(--cream-dim); font-size: 0.85rem; }
+.badge { margin-right: auto; }
 .reset {
-  margin-left: auto;
   min-height: 40px;
   padding: 0;
   border: 0;

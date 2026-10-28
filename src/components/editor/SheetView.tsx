@@ -25,6 +25,8 @@ type Props = {
   onSelect?: (s: Selection) => void;
   /** Lines to keep at full strength; the rest fade. Used by the student view. */
   focus?: Set<Id>;
+  /** Lines that changed since the student last looked; marked with a dot. */
+  changed?: Set<Id>;
   /** Draws a gutter with line handles and makes words tappable. */
   interactive?: boolean;
   onEditSection?: (section: Id) => void;
@@ -38,7 +40,7 @@ export function whoLabel(a: { people: Id[]; groups: Id[] }, people: Person[], gr
   return [...g, ...p].join(', ');
 }
 
-export function SheetView({ doc, people, groups, selection, onSelect, focus, interactive = false, onEditSection }: Props) {
+export function SheetView({ doc, people, groups, selection, onSelect, focus, changed, interactive = false, onEditSection }: Props) {
   const colors = useMemo(() => songColors(doc), [doc]);
   const order = useMemo(() => lineOrder(doc), [doc]);
   const brackets = useMemo(() => overlays(doc, colors), [doc, colors]);
@@ -122,7 +124,7 @@ export function SheetView({ doc, people, groups, selection, onSelect, focus, int
                         {i + 1}
                       </button>
                     ) : (
-                      <span className={styles.gutter} />
+                      <span className={styles.gutter}>{changed?.has(line.id) && <span className={styles.dot} aria-label="Cambió" />}</span>
                     )}
                     <span className={`${styles.text} ${line.added ? styles.added : ''}`}>
                       {lineSegments(doc, line.id, colors).map((seg) => (

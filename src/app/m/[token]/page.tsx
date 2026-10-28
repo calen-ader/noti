@@ -1,7 +1,11 @@
-import { StudentPlaceholder } from '@/components/StudentPlaceholder';
+import { NotFound } from '@/components/NotFound';
+import { StudentShow } from '@/components/student/StudentShow';
+import { publishedShow } from '@/lib/show/published';
 
-// Whole-show link. The show view (pick your name, my lines) arrives in part 3.
+export const dynamic = 'force-dynamic';
+
+// Whole-show link: every song in order, the student's own songs marked.
 export default async function ShowLink({ params }: { params: Promise<{ token: string }> }) {
-  const { token } = await params;
-  return <StudentPlaceholder rpc="published_show" token={token} pick={(d) => d?.title} />;
+  const p = await publishedShow((await params).token);
+  return p ? <StudentShow {...p} /> : <NotFound />;
 }

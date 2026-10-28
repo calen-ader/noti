@@ -104,3 +104,5 @@
 
 
 .note { color: var(--pen); font: italic 0.72em/1.4 var(--f-body); }
+
+.dot { display: inline-block; width: 0.5em; height: 0.5em; margin-top: 0.4em; border-radius: 50%; background: #e0452b; }

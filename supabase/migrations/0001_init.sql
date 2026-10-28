@@ -189,7 +189,7 @@ $$;
 create function published_song(p_token text) returns jsonb
   language sql stable security definer set search_path = public as $$
   select jsonb_build_object(
-           'show', jsonb_build_object('title', r.snapshot->>'title'),
+           'show', jsonb_build_object('id', r.snapshot->>'id', 'title', r.snapshot->>'title'),
            'people', r.snapshot->'people',
            'groups', r.snapshot->'groups',
            'song', (select x from jsonb_array_elements(r.snapshot->'songs') x where x->>'id' = ss.song_id::text),

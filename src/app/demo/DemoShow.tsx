@@ -34,6 +34,7 @@ export function DemoShow() {
       <header className={styles.top}>
         <Link href="/" className={styles.brand}>Noti</Link>
         <span className={styles.badge}>Prueba: se guarda solo en este navegador</span>
+        <Link href="/demo/alumno" className={styles.reset}>Abrir como link de alumno</Link>
         <button className={styles.reset} onClick={() => setShow(demoShow())}>Empezar de nuevo</button>
       </header>
       {show && <ShowWorkspace show={show} onChange={setShow} />}

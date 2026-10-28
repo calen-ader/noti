@@ -1,7 +1,11 @@
-import { StudentPlaceholder } from '@/components/StudentPlaceholder';
+import { NotFound } from '@/components/NotFound';
+import { StudentShow } from '@/components/student/StudentShow';
+import { publishedSong } from '@/lib/show/published';
 
-// Single-song link. The song view arrives in part 3.
+export const dynamic = 'force-dynamic';
+
+// Single-song link.
 export default async function SongLink({ params }: { params: Promise<{ token: string }> }) {
-  const { token } = await params;
-  return <StudentPlaceholder rpc="published_song" token={token} pick={(d) => d?.song?.title} />;
+  const p = await publishedSong((await params).token);
+  return p ? <StudentShow {...p} /> : <NotFound />;
 }

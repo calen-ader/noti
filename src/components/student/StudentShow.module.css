@@ -1,0 +1,31 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 48rem;
+  margin: 0 auto;
+  padding-block: max(24px, env(safe-area-inset-top)) 64px;
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+}
+
+.head { display: flex; flex-direction: column; gap: 8px; }
+.eyebrow { margin: 0; color: var(--cream-dim); font-size: 0.8rem; letter-spacing: 0.08em; }
+.title { margin: 0; font-size: clamp(2rem, 7vw, 3.2rem); line-height: 1.05; text-wrap: balance; }
+.note { margin: 0; padding-left: 12px; border-left: 3px solid var(--cream); max-width: 50ch; }
+
+.who { display: flex; flex-direction: column; gap: 8px; }
+.who label { font-size: 0.9rem; color: var(--cream-dim); }
+.who select { height: 50px; padding: 0 12px; border: 0; border-bottom: 2px solid var(--line); background: var(--field); color: var(--cream); font: inherit; font-size: 1.05rem; max-width: 22rem; }
+.hint { margin: 0; color: var(--cream-dim); font-size: 0.9rem; max-width: 50ch; }
+
+.changed { margin: 0; padding: 12px 14px; background: #2a2716; font-size: 0.95rem; }
+
+.toc ol { margin: 0; padding-left: 1.4em; display: flex; flex-direction: column; gap: 6px; }
+.toc a { text-decoration: none; }
+.toc a:hover { text-decoration: underline; }
+.yours { color: #fff06a; font-size: 0.9em; }
+
+.song { display: flex; flex-direction: column; gap: 10px; scroll-margin-top: 16px; }
+.songTitle { margin: 0; font-size: 1.4rem; }
+.num { font-family: var(--f-mono); font-size: 0.8em; color: var(--cream-dim); }
