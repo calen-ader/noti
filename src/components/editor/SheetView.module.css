@@ -1,0 +1,106 @@
+/* The sheet is paper: light, with highlighter colours, even inside the dark app. */
+.outer {
+  --paper: #fbfaf3;
+  --paper-ink: #1b1a16;
+  --paper-mute: #7c7a6c;
+  --paper-rule: #e6e3d3;
+  --pen: #2f3fb8;
+  --hl-yellow: #fff06a;
+  --hl-green: #a3ea9c;
+  --hl-pink: #ffb1dc;
+  --hl-cyan: #98e3f8;
+  --hl-orange: #ffc68c;
+  --hl-violet: #cdb8ff;
+  --hl-red: #ff9f95;
+  --hl-blue: #a2c0ff;
+  --hl-lime: #d9f07a;
+  width: 100%;
+  overflow: hidden;
+  background: var(--paper);
+  border-radius: 2px;
+}
+
+.page {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 28px 28px 36px;
+  min-width: 34em;
+  transform-origin: 0 0;
+  color: var(--paper-ink);
+  font-size: 20px;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.section { display: flex; flex-direction: column; gap: 3px; }
+
+.sectionRow, .line, .note {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.sectionLabel {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--paper-mute);
+  font: 600 0.62em/1.4 var(--f-body);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.sectionLabel:disabled { cursor: default; }
+
+.gutter {
+  flex: none;
+  width: 2.1em;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--paper-mute);
+  font: 0.62em/1 var(--f-mono);
+  text-align: right;
+  cursor: pointer;
+  align-self: stretch;
+}
+
+.text { padding: 1px 0; }
+
+.added { font-style: italic; color: #4a4838; }
+
+.seg { padding: 2px 0; border-radius: 2px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+
+.word { cursor: pointer; border-radius: 2px; }
+
+.picked { outline: 2px solid var(--pen); outline-offset: 1px; }
+
+.selected .text { box-shadow: inset 3px 0 0 var(--pen); padding-left: 8px; margin-left: -11px; }
+.selected .gutter { color: var(--pen); font-weight: 600; }
+
+.faded { opacity: 0.32; }
+
+.names {
+  display: flex;
+  gap: 10px;
+  color: var(--pen);
+  font: italic 0.7em/1.2 var(--f-body);
+}
+
+.check { color: #c2410c; text-decoration: underline wavy; }
+
+.brackets { display: flex; gap: 6px; align-self: stretch; margin-left: auto; padding-left: 24px; }
+
+.bracket {
+  width: 10px;
+  border-right: 2px solid var(--pen);
+}
+
+.bracket[data-first='true'] { border-top: 2px solid var(--pen); margin-top: 6px; }
+.bracket[data-last='true'] { border-bottom: 2px solid var(--pen); margin-bottom: 6px; }
+
+
+.note { color: var(--pen); font: italic 0.72em/1.4 var(--f-body); }
