@@ -1,0 +1,21 @@
+.page {
+  min-height: 100svh;
+  max-width: 40rem;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 16px;
+  padding-block: 40px;
+  padding-left: max(20px, env(safe-area-inset-left));
+  padding-right: max(20px, env(safe-area-inset-right));
+}
+
+.code {
+  margin: 0;
+  font-family: var(--f-mono);
+  letter-spacing: 0.24em;
+  color: var(--cream-dim);
+}
+
+.title { margin: 0; font-size: clamp(1.6rem, 5vw, 2.4rem); line-height: 1.15; text-wrap: balance; }
