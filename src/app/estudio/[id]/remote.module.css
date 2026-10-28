@@ -1,0 +1,19 @@
+.status { margin-left: auto; color: var(--cream-dim); font-size: 0.85rem; }
+.status[data-status='error'], .status[data-status='stale'] { color: var(--error); }
+
+.share { display: flex; flex-direction: column; gap: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+
+.publish { display: flex; flex-direction: column; gap: 8px; }
+.publish label { font-size: 0.85rem; color: var(--cream-dim); }
+.publish input { height: 44px; padding: 0 10px; border: 0; border-bottom: 2px solid var(--line); background: var(--field); color: var(--cream); font: inherit; font-size: 0.92rem; }
+.publish input:focus { outline: none; border-bottom-color: var(--cream); }
+.publish button { min-height: 46px; border: 0; background: var(--cream); color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; }
+.publish button:disabled { opacity: 0.6; }
+
+.ok { margin: 0; font-size: 0.88rem; }
+.bad { margin: 0; font-size: 0.88rem; color: var(--error); }
+
+.copy { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.copy span { font-size: 0.85rem; color: var(--cream-dim); }
+.copy code { font: 0.78rem/1.4 var(--f-mono); overflow-wrap: anywhere; }
+.copy button { align-self: flex-start; min-height: 36px; padding: 0; border: 0; background: none; color: var(--cream); font: inherit; font-size: 0.9rem; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }

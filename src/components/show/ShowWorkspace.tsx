@@ -12,7 +12,7 @@ import styles from './ShowWorkspace.module.css';
 
 type Panel = { kind: 'song'; id: Id } | { kind: 'new' } | { kind: 'roster' } | { kind: 'preview'; id: Id };
 
-export function ShowWorkspace({ show, onChange }: { show: Show; onChange: (s: Show) => void }) {
+export function ShowWorkspace({ show, onChange, extra }: { show: Show; onChange: (s: Show) => void; extra?: (songId: Id | null) => React.ReactNode }) {
   const [panel, setPanel] = useState<Panel>(show.songs[0] ? { kind: 'song', id: show.songs[0].id } : { kind: 'new' });
   const song = panel.kind === 'song' || panel.kind === 'preview' ? show.songs.find((s) => s.id === panel.id) : undefined;
 
@@ -55,6 +55,7 @@ export function ShowWorkspace({ show, onChange }: { show: Show; onChange: (s: Sh
           <button className={styles.link} onClick={() => setPanel({ kind: 'new' })}>Agregar canción</button>
           <button className={styles.link} onClick={() => setPanel({ kind: 'roster' })}>Alumnos y micrófonos</button>
         </div>
+        {extra?.(song?.id ?? null)}
       </nav>
 
       <div className={styles.main}>

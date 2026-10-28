@@ -6,7 +6,6 @@
 -- Students never touch these tables: they read immutable published revisions through
 -- security-definer functions, keyed by a show link token or a song link token.
 
-create extension if not exists pgcrypto;
 
 -- Teachers -------------------------------------------------------------------
 
@@ -73,7 +72,7 @@ create table shows (
   title text not null,
   show_date date,
   -- the whole-show link; song links live on show_songs
-  link_token text not null unique default encode(gen_random_bytes(12), 'hex'),
+  link_token text not null unique default replace(gen_random_uuid()::text, '-', ''),
   created_at timestamptz not null default now()
 );
 
@@ -81,7 +80,7 @@ create table show_songs (
   show_id uuid not null references shows on delete cascade,
   song_id uuid not null references songs on delete cascade,
   position text not null, -- fractional index, so reordering never renumbers
-  link_token text not null unique default encode(gen_random_bytes(12), 'hex'),
+  link_token text not null unique default replace(gen_random_uuid()::text, '-', ''),
   primary key (show_id, song_id)
 );
 
