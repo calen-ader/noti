@@ -7,7 +7,26 @@ const EN = LANG === 'en';
 
 export function mount(stage, boot) {
   watchTranslate(stage);
-const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// What comes from the database is checked once on arrival. Text people typed is escaped where it's drawn; the values
+// below (ids, colours, times, tokens) go into the page as they are, so anything that could break out of an attribute
+// or a style is dropped here. The app never writes such values; this is for a project saved some other way.
+const SAFE = /^[^<>"'&`;{}\\]*$/;
+const STRUCT = new Set(['id', 'pid', 'project_id', 'pc', 'pf', 'link', 'invite', 'ts', 'time', 'date', 'rep', 'bpm', 'kind', 'vis', 'avatar', 'at', 'key', 'remind', 'repeat', 'day', 'mon', 'songs', 'order', '$set']);
+function clean(v, k) {
+  if (Array.isArray(v)) return v.map(x => clean(x, k));
+  if (v && typeof v === 'object') {
+    const out = {};
+    for (const [kk, vv] of Object.entries(v)) {
+      if (k === 'colors') { if (typeof vv === 'string' && /^[a-z0-9-]{1,24}$/.test(vv)) out[kk] = vv; }
+      else out[kk] = clean(vv, kk);
+    }
+    return out;
+  }
+  if (typeof v !== 'string') return v;
+  if (k === 'url') return /^(https:|blob:)/.test(v) && SAFE.test(v) ? v : '';
+  return STRUCT.has(k) && !SAFE.test(v) ? '' : v;
+}
 // ids are random: two people (or two devices) make blocks at the same time
 const uid = (p = 'r') => p + Math.random().toString(36).slice(2, 10);
 const token = () => Array.from(crypto.getRandomValues(new Uint8Array(12)), b => 'abcdefghijkmnpqrstuvwxyz23456789'[b % 32]).join('');
@@ -419,7 +438,7 @@ function lineWho(song, r, colors) {
   const out = []; const seen = new Set();
   for (const w of Object.values(song.main[r.id] ?? {})) if (!seen.has(w)) { seen.add(w); out.push(`<b style="--h:${cv(colors[w])}">${esc(nameOf(w))}</b>`); }
   const ovs = new Map(); for (const o of Object.values(song.ov[r.id] ?? {})) ovs.set(o.who + o.role, o);
-  for (const o of ovs.values()) out.push(`<b class="ov" style="--h:${cv(colors[o.who])}">${o.role ? o.role + ' ' : ''}${esc(nameOf(o.who))}</b>`);
+  for (const o of ovs.values()) out.push(`<b class="ov" style="--h:${cv(colors[o.who])}">${o.role ? esc(o.role) + ' ' : ''}${esc(nameOf(o.who))}</b>`);
   return out.join('');
 }
 function wordsV(song, r, colors, opt = {}) {
@@ -717,9 +736,9 @@ function project() {
   if (tab === 'canciones' && S.sview === 'hojas' && p.songs.length) pane = songTiles(p);
   else if (tab === 'canciones') pane = `${p.songs.length ? '<div class="ohead"><span></span><span>#</span><span>Canción</span><span>Tono</span><span></span></div>' : '<p class="empty1">Sin canciones todavía.</p>'}<ol class="order" id="order">${p.songs.map((s, i) => orderRow(p, s, i)).join('')}</ol>
     <button class="b add" data-newsong>+ Canción</button>`;
-  if (tab === 'personas') pane = `<div class="people"><div><h3>Con acceso</h3><div class="plist">${p.editors.map(([n, r]) => `<span>${esc(n)}${n === ME ? ' (vos)' : ''}<small>${r}</small></span>`).join('')}</div></div>
+  if (tab === 'personas') pane = `<div class="people"><div><h3>Con acceso</h3><div class="plist">${p.editors.map(([n, r]) => `<span>${esc(n)}${n === ME ? ' (vos)' : ''}<small>${esc(r)}</small></span>`).join('')}</div></div>
       <button class="b add" data-sharepop>+ Invitar</button>
-      ${p.people ? `<div><h3>Grupos</h3>${crew(p).groups.filter(g => g.id !== 'todxs').map(g => `<div class="grp"><b>${esc(g.label)}</b><span>${g.members.join(', ')}</span></div>`).join('')}</div>`
+      ${p.people ? `<div><h3>Grupos</h3>${crew(p).groups.filter(g => g.id !== 'todxs').map(g => `<div class="grp"><b>${esc(g.label)}</b><span>${esc(g.members.join(', '))}</span></div>`).join('')}</div>`
         : `<div><h3>Grupos</h3><button class="b add" data-addpeople>+ Crear un grupo</button></div>`}</div>`;
   if (tab === 'fechas') { const all = evs(p).map(e => ({ e, p })).sort(byWhen), up = all.filter(x => x.e.date >= TODAY), past = all.filter(x => x.e.date < TODAY).reverse();
     pane = `<div class="agroup">${up.length ? up.map(x => evRow(x, { noProj: true })).join('') : '<p class="empty1">Nada próximo.</p>'}</div>
@@ -2139,20 +2158,21 @@ function load(data) {
   saved.set('me', { v: 1 });
   remember();
 }
+const incoming = clean(boot.data ?? null);
 if (boot.mode === 'studio') {
-  load(boot.data);
+  load(incoming);
   if (!boot.me?.name) S.modal = 'name';
   const want = PROJECTS.find(p => p.id === boot.open);
   S.pid = (want ?? PROJECTS[0])?.id ?? null; if (S.pid) S.open.add(S.pid);
   if (want) S.screen = 'project';
 }
 if (boot.mode === 'demo') { // the examples the first time; after that, what was saved in this browser
-  if (boot.data?.projects?.length) load(boot.data);
+  if (incoming?.projects?.length) load(incoming);
   else { const d = demoData(); PROJECTS.push(...d.projects); EVENTS.push(...d.events); }
   S.pid = PROJECTS[0]?.id ?? null; if (S.pid) S.open.add(S.pid);
 }
 if (boot.mode === 'student') {
-  const x = boot.data;
+  const x = incoming;
   PROJECTS.push({ id: x.id, name: x.name, pc: x.pc, people: !!x.people, cast: x.cast, colors: x.colors ?? { todxs: 'y' }, shared: true, songs: [], tags: [], editors: [], published: dec(x.published) });
   EVENTS.push(...(x.events ?? []).map(e => ({ ...e, pid: x.id })));
   S.sPid = x.id; S.pid = x.id;

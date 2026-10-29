@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { safeNext } from '@/lib/next';
 import { supabaseServer } from '@/lib/supabase/server';
 import { Studio } from '@/studio/Studio';
 
@@ -16,8 +17,6 @@ async function googleOn() {
     return false;
   }
 }
-
-const safeNext = (n: string | undefined) => (n && n.startsWith('/') && !n.startsWith('//') ? n : null);
 
 // Sign-in for whoever edits: Google, mail and password, or a mailed link. Students never sign in; they open the link they were sent.
 export default async function Home({ searchParams }: { searchParams: Promise<{ next?: string; code?: string }> }) {
