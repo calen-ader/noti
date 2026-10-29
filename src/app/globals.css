@@ -1,31 +1,5 @@
-/* Noti is dark-first: the wordmark is cream on near-black, and the sign-in page follows it. */
-:root {
-  --ink: #0d0d0d;
-  --cream: #f0eec9;
-  --cream-dim: #b9b79a;
-  --line: #2a2a26;
-  --field: #171715;
-  --error: #ff9a8a;
-  --f-body: var(--font-body), 'Helvetica Neue', Arial, sans-serif;
-  --f-mono: var(--font-mono), ui-monospace, Menlo, monospace;
-  color-scheme: dark;
-}
-
+/* Base only: the studio brings its own colours (src/studio/studio.css); plain pages set theirs in placeholder.module.css. */
 * { box-sizing: border-box; }
-
 html, body { margin: 0; min-height: 100%; }
-
-body {
-  background: var(--ink);
-  color: var(--cream);
-  font: 16px/1.5 var(--f-body);
-  -webkit-font-smoothing: antialiased;
-}
-
+body { font: 16px/1.5 var(--font-ui), 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased; }
 a { color: inherit; }
-
-:focus-visible { outline: 2px solid var(--cream); outline-offset: 3px; }
-
-@media (prefers-reduced-motion: reduce) {
-  * { transition: none !important; }
-}

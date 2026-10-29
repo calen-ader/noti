@@ -11,11 +11,7 @@
   padding-right: max(20px, env(safe-area-inset-right));
 }
 
-.code {
-  margin: 0;
-  font-family: var(--f-mono);
-  letter-spacing: 0.24em;
-  color: var(--cream-dim);
-}
+.wrap { background: #0d0d0d; color: #f0eec9; color-scheme: dark; min-height: 100svh; }
 
-.title { margin: 0; font-size: clamp(1.6rem, 5vw, 2.4rem); line-height: 1.15; text-wrap: balance; }
+.title { margin: 0; font-size: clamp(1.6rem, 5vw, 2.4rem); font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; text-wrap: balance; }
+.page p { margin: 0; color: rgba(240, 238, 201, 0.7); }
