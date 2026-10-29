@@ -807,7 +807,7 @@ function popV() {
     const pal = palette(song.key).concat(S.custom.map(c => ({ c, rn: '' })));
     const isBar = P.bar != null;
     return `<div class="pop"><div class="cgrid">${pal.map(x => `<button data-setc="${esc(x.c)}"><b>${esc(x.c)}</b><small>${x.rn}</small></button>`).join('')}</div>
-      <form class="otro" data-otro><input id="otro" placeholder="Otro acorde" autocomplete="off" autocapitalize="off" spellcheck="false"></form>
+      <form class="otro" data-otro><input id="otro" placeholder="Escribí un acorde" aria-label="Escribí un acorde" autocomplete="off" autocapitalize="off" spellcheck="false"></form>
       <div class="prow">${isBar ? `<button class="b" data-setc="%">%</button><button class="b${S.split ? ' on' : ''}" data-split>Dos por compás</button><button class="b" data-delbar>Quitar compás</button>` : ''}<button class="b" data-setc="">Sin acorde</button></div></div>`;
   }
   if (P.type === 'singer') {
@@ -839,7 +839,7 @@ const nameModal = () => `<div class="scrim"><form class="modal" id="nameform"><h
 const passModal = () => `<div class="scrim" data-close><form class="modal" id="passform"><h3>Contraseña</h3><p>Para entrar con tu mail sin esperar un link.</p>
   <input id="newpass" type="password" minlength="6" required autocomplete="new-password" placeholder="Al menos 6 caracteres" aria-label="Contraseña nueva"><input type="email" value="${esc(boot.me?.email ?? '')}" autocomplete="username" hidden>
   <div class="mbtns"><button class="b" type="button" data-close>Cancelar</button><button class="b solid" type="submit">Guardar</button></div></form></div>`;
-const keysModal = () => `<div class="scrim"><div class="modal"><h3>Atajos de teclado</h3><dl class="keys2">${[['⌘K', 'Buscar'], ['/', 'Insertar algo en una línea vacía'], ['Enter', 'Línea nueva; en una línea vacía, sección nueva'], ['⌫', 'Al principio de una parte: unirla con la de arriba'], ['⌘X ⌘C ⌘V', 'Cortar, copiar y pegar lo seleccionado, con acordes y etiquetas'], ['⌘Z ⇧⌘Z', 'Deshacer y rehacer'], ['Esc', 'Cerrar o soltar la selección'], ['Espacio', 'Ensayo: correr o pausar'], ['← →', 'Ensayo: canción anterior o siguiente']].map(([k, t]) => `<dt><kbd>${k}</kbd></dt><dd>${t}</dd>`).join('')}</dl><div class="mbtns"><button class="b solid" data-close>Listo</button></div></div></div>`;
+const keysModal = () => `<div class="scrim"><div class="modal"><h3>Atajos de teclado</h3><dl class="keys2">${[['⌘K', 'Buscar'], ['/', 'Insertar algo en una línea vacía'], ['Enter', 'Línea nueva; en una línea vacía, sección nueva'], ['⌫', 'Al principio de una parte: unirla con la de arriba'], ['⌘X ⌘C ⌘V', 'Cortar, copiar y pegar lo seleccionado, con acordes y etiquetas'], ['⌘Z ⇧⌘Z', 'Deshacer y rehacer'], ['Esc', 'Cerrar o soltar la selección'], ['A–G', 'Con un acorde abierto: escribirlo (am7, f#, bb/d) y Enter'], ['Tab ⇧Tab', 'Acordes: siguiente o anterior palabra o compás'], ['1–8', 'Acordes: los del tono, en orden'], ['Espacio', 'Ensayo: correr o pausar'], ['← →', 'Ensayo: canción anterior o siguiente']].map(([k, t]) => `<dt><kbd>${k}</kbd></dt><dd>${t}</dd>`).join('')}</dl><div class="mbtns"><button class="b solid" data-close>Listo</button></div></div></div>`;
 // B: a calendar subscription puts the events in the phone's own calendar and keeps them updated; the reminders then come from that calendar
 const subModal = () => `<div class="scrim"><div class="modal"><h3>Conectar con tu calendario</h3><p>Tus eventos aparecen en Google Calendar, Apple u Outlook y se actualizan solos.</p>
   <div class="lnk"><span>webcal://noti.app/cal/calen-7k2q.ics</span><button class="b" data-copy="noti.app/cal/calen-7k2q.ics">Copiar</button></div>
@@ -1241,6 +1241,28 @@ function setChord(c) {
   if (c && c !== '%') { ac().resume(); strum(c, ac().currentTime + 0.02, 1.1); }
   autoKey(song);
 }
+// a chord as typed: "am7", "f#", "bb/d", "C♯m" all come out as written on a chart
+function normChord(v) {
+  v = v.trim().replace(/\s+/g, '').replace(/♯/g, '#').replace(/♭/g, 'b');
+  if (v === '-' || v === '%') return v;
+  v = v.replace(/^([a-g])/, (x) => x.toUpperCase()).replace(/\/([a-g])/, (x, n) => '/' + n.toUpperCase());
+  return splitChord(v) ? v : null;
+}
+// Tab and the arrows in the chord box: on to the next word or bar (or back), across lines
+function stepChord(d) {
+  const song = cur(); const P = S.pop; const { row } = findRow(song, P.row);
+  if (P.bar != null) {
+    const nb = P.bar + d;
+    if (nb >= 0 && nb < row.bars.length) { P.bar = nb; return; }
+    const rows = rowsOf(song).filter(r => r.kind === 'bars'); const next = rows[rows.indexOf(row) + d];
+    if (next) { P.row = next.id; P.bar = d > 0 ? 0 : next.bars.length - 1; }
+    else if (d > 0) { pushHist(); row.bars.push([]); mark(row.id); P.bar = row.bars.length - 1; }
+    return;
+  }
+  const words = []; for (const r of rowsOf(song)) if (r.kind === 'lyric') r.words.forEach((w, i) => { if (w) words.push({ row: r.id, i }); });
+  const k = words.findIndex(x => x.row === P.row && x.i === P.i); const n = words[k + d];
+  if (n) { P.row = n.row; P.i = n.i; S.sel = [n]; }
+}
 function paint(who) {
   const song = cur(); pushHist();
   for (const { row, i } of S.sel) {
@@ -1471,7 +1493,7 @@ function after() {
         : P.type === 'chord' ? rectOf([document.getElementById(`e-${P.row}-${P.i}`)])
         : rectOf(S.sel.map(x => document.getElementById(`e-${x.row}-${x.i}`)));
       place(popV(), anchor, P.type === 'meta' || P.bar != null ? 'below' : 'above');
-      if (P.type === 'singer' && matchMedia('(pointer: fine)').matches) document.getElementById('tagq')?.focus({ preventScroll: true });
+      if ((P.type === 'singer' || P.type === 'chord') && matchMedia('(pointer: fine)').matches) document.getElementById(P.type === 'chord' ? 'otro' : 'tagq')?.focus({ preventScroll: true });
     } else if (S.sel.length && !S.tool && S.tbar !== 'isla') {
       const a = rectOf(S.sel.map(x => document.getElementById(`e-${x.row}-${x.i}`)));
       const lane = document.getElementById(`e-${S.sel[0].row}-${S.sel[0].i}`)?.closest('.lanes') ? 20 : 0; // keep the chords above the selection visible
@@ -1888,6 +1910,27 @@ document.addEventListener('keydown', (e) => {
     else if (k === 'ArrowUp' || k === 'PageUp') { e.preventDefault(); rehPage(-1); }
     else if (k === 'ArrowRight') handle(null, e, { rehgo: '1' }); else if (k === 'ArrowLeft') handle(null, e, { rehgo: '-1' });
     return; }
+  if (S.pop?.type === 'chord' && S.screen === 'song') {
+    const box = document.getElementById('otro');
+    if (el === box) {
+      const empty = !box.value.trim();
+      if (e.key === 'Tab' || (empty && (e.key === 'ArrowRight' || e.key === 'ArrowLeft'))) {
+        e.preventDefault(); const d = e.key === 'ArrowLeft' || e.shiftKey ? -1 : 1;
+        if (!empty) { const v = normChord(box.value); if (!v) { toast('No reconozco ese acorde'); return; } const bar = S.pop.bar;
+          if (v !== '%' && v !== '-' && !S.custom.includes(v) && !palette(cur().key).some(x => x.c === v)) S.custom.push(v);
+          const was = S.pop; const { row } = findRow(cur(), was.row); const n = row.bars?.length;
+          setChord(v === '-' ? '' : v); S.pop = was; S.sel = bar == null ? [{ row: was.row, i: was.i }] : [];
+          if (bar != null) { if (row.bars.length > n) row.bars.pop(); was.bar = bar; } } // Tab decides where to go, not the chord
+        stepChord(d); render(); return;
+      }
+      if (empty && /^[1-8]$/.test(e.key)) { e.preventDefault(); const c = palette(cur().key)[+e.key - 1]?.c; if (c) { setChord(c); render(); } return; } // 1 to 8: the chords of the key, in order
+      if (empty && (e.key === 'Backspace' || e.key === 'Delete')) { e.preventDefault(); setChord(''); render(); return; }
+    } else if (e.key.length === 1 && /[a-g1-8%-]/i.test(e.key) && !e.metaKey && !e.ctrlKey && !e.altKey && !/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) && !el.isContentEditable && box) {
+      box.focus({ preventScroll: true }); // typing with the box not focused (a tap opened it): the letters go in anyway
+      if (/[1-8]/.test(e.key)) { e.preventDefault(); box.dispatchEvent(new KeyboardEvent('keydown', { key: e.key, bubbles: true })); }
+      return;
+    }
+  }
   if (e.key === 'Escape' && S.ev && !/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) { S.ev = null; render(); return; }
   if (e.key === 'Escape' && /share|me/.test(S.menu?.kind ?? '')) { S.menu = null; render(); return; }
   if (e.key === 'Escape' && S.modal && S.modal !== 'pub') { S.modal = null; render(); return; }
@@ -2049,7 +2092,9 @@ document.addEventListener('submit', (e) => {
   if (f.dataset.mename !== undefined) { setName(document.getElementById('myname').value); render(); return; }
   if (f.id === 'nameform') { const v = document.getElementById('firstname').value.trim(); if (!v) return; setName(v); S.modal = null; render(); return; }
   if (f.dataset.rform !== undefined) { const v = document.getElementById('rnote').value.trim(); const s = cur(); if (v) { pushHist(); ((s.replies ??= {})[S.replyAt] ??= []).push({ who: ME, text: v }); mark(S.replyAt); } S.replyAt = null; render(); return; }
-  if (f.dataset.otro !== undefined) { const v = document.getElementById('otro').value.trim(); if (!splitChord(v)) { toast('No reconozco ese acorde'); return; } if (!S.custom.includes(v)) S.custom.push(v); setChord(v); render(); return; }
+  if (f.dataset.otro !== undefined) { const t = document.getElementById('otro').value; if (!t.trim()) return; const v = normChord(t); if (!v) { toast('No reconozco ese acorde'); return; }
+    if (v === '-' || (v === '%' && S.pop.bar == null)) { setChord(''); render(); return; }
+    if (v !== '%' && !S.custom.includes(v) && !palette(cur().key).some(x => x.c === v)) S.custom.push(v); setChord(v); render(); return; }
   if (f.dataset.cform !== undefined) { const v = document.getElementById('cnote').value.trim(); const s = cur(); const at = S.composer.at; if ((s.notes[at] ?? '') !== v) { pushHist(); if (v) { s.notes[at] = v; (s.noteBy ??= {})[at] = ME; } else delete s.notes[at]; mark(at); } S.composer = null; render(); return; }
   if (f.dataset.newtag !== undefined) { const v = document.getElementById('tagq').value; const vis = [...f.closest('.pop').querySelectorAll('.trow:not([hidden]) .tn')];
     if (vis.length === 1 && !vis[0].closest('.tagpop').querySelector('[data-mknew]:not([hidden])')) { paint(vis[0].dataset.paint); render(); } else makeTag(v); return; }
