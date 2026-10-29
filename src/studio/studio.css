@@ -147,6 +147,10 @@ svg.ic { width: 12px; height: 12px; display: inline-block; fill: currentColor; v
 .bar > span + span { margin-left: 0 }
 .bar .chs { display: grid; grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr)); white-space: nowrap }
 .bar .chs > span { padding-right: 4px }
+.bar .chs.stk { display: block; position: relative }
+.bar .chs.stk > span { position: absolute; left: 0; bottom: 0; padding: 0; white-space: nowrap; line-height: 1.1 }
+.bar .chs.stk > i { position: absolute; bottom: -3px; width: 1px; background: var(--faint) }
+.bar .bt i.hit b { background: var(--ink); opacity: 1 }
 .bar:not(.plus) { container-type: inline-size }
 /* a busy bar: the chords get smaller to fit, never below a readable size */
 .bar .chs { font-size: clamp(0.78rem, calc(100cqi / (var(--k, 1) * 2.3)), 1em) }

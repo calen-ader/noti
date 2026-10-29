@@ -818,7 +818,7 @@ function popV() {
     const at = P.slot != null ? `<p class="slotat">${EN ? 'Beat' : 'Tiempo'} ${Math.floor(P.slot / 2) + 1}${P.slot % 2 ? (EN ? ' and' : ' y') : ''}</p>` : '';
     return `<div class="pop">${at}<div class="cgrid">${pal.map(x => `<button data-setc="${esc(x.c)}"><b>${esc(x.c)}</b><small>${x.rn}</small></button>`).join('')}</div>
       <form class="otro" data-otro><input id="otro" placeholder="${P.bar != null && P.slot == null ? 'Escribí uno o varios: C G Am, o C . . G' : 'Escribí un acorde'}" aria-label="Escribí un acorde" autocomplete="off" autocapitalize="off" spellcheck="false"></form>
-      <div class="prow">${isBar ? `<button class="b" data-setc="%">%</button><button class="b${S.split ? ' on' : ''}" data-split>Dos por compás</button><button class="b" data-delbar>Quitar compás</button>` : ''}<button class="b" data-setc="">Sin acorde</button></div></div>`;
+      <div class="prow">${isBar ? `<button class="b" data-setc="%">% Igual al anterior</button><button class="b" data-delbar>Quitar compás</button>` : ''}<button class="b" data-setc="">Sin acorde</button></div></div>`;
   }
   if (P.type === 'singer') {
     // tags, the way Notion does select options: type to find one, or to make one; the square changes its colour
@@ -1240,14 +1240,13 @@ function setChord(c) {
   } else if (P.bar != null && Array.isArray(c)) { // typed in one go: "C G Am", or "C . . G"
     const { row } = findRow(song, P.row); row.bars[P.bar] = c; mark(row.id); P.bar++; if (P.bar >= row.bars.length) row.bars.push([]); c = c.find(x => x !== '.');
   } else if (P.bar != null) {
-    const { row } = findRow(song, P.row); const b = row.bars[P.bar];
+    const { row } = findRow(song, P.row);
     if (c === '') row.bars[P.bar] = [];
     else if (c === '%') row.bars[P.bar] = ['%'];
-    else if (S.split && b.length === 1 && b[0] !== '%') row.bars[P.bar] = [b[0], c];
     else row.bars[P.bar] = [c];
     mark(row.id);
     // move on to the next bar so a progression can be tapped in one go
-    if (!(S.split && row.bars[P.bar].length < 2 && c)) { P.bar++; if (P.bar >= row.bars.length) row.bars.push([]); }
+    P.bar++; if (P.bar >= row.bars.length) row.bars.push([]);
   } else {
     const { row } = findRow(song, P.row);
     if (c === '' || c === '%') delete row.chords[P.i]; else row.chords[P.i] = c;
@@ -1484,6 +1483,33 @@ function spaceChords() {
     if (need > have) w.style.paddingRight = (need - have) + 'px';
   }
 }
+// A busy bar whose chords still collide at the smallest size: the chords step up, each with a thin line down
+// to its beat. Worked out right to left, so the last chord sits on the bar and each earlier one goes as low as
+// it can without touching a chord or a line to its right: lines only ever pass under text, never through it.
+function stackBars() {
+  measureCtx ??= document.createElement('canvas').getContext('2d');
+  for (const chs of document.querySelectorAll('.bar .chs')) {
+    chs.classList.remove('stk'); chs.style.height = ''; chs.querySelectorAll('i').forEach(x => x.remove());
+    const bar = chs.closest('.bar'); bar.querySelectorAll('.bt .hit').forEach(x => x.classList.remove('hit'));
+    const spans = [...chs.children]; const n = spans.length; if (n < 2) continue;
+    const dots = [...bar.querySelectorAll('.bt > i')]; const steps = dots.length; if (!steps) continue;
+    const W = chs.clientWidth, step = (W + 8) / steps; // the beat marks run under the bar's right padding too
+    measureCtx.font = getComputedStyle(chs).font;
+    const items = spans.map((sp, j) => ({ sp, at: Math.round(j * steps / n), wd: measureCtx.measureText(sp.textContent).width })).filter(x => x.sp.textContent);
+    const crowded = items.some((x, j) => { const next = items[j + 1]; const room = (next ? next.at * W / steps : W + 6) - x.at * W / steps; return x.wd + 4 > room; });
+    if (!crowded) continue;
+    for (const x of items) { x.left = x.at * step; if (x.left + x.wd > W + 6) x.left = Math.max(0, W + 6 - x.wd); x.right = x.left + x.wd + 4; }
+    for (let j = items.length - 1; j >= 0; j--) { let lv = 0; while (items.slice(j + 1).some(k => k.lv >= lv && k.left < items[j].right)) lv++; items[j].lv = lv; }
+    const lh = parseFloat(getComputedStyle(chs).fontSize) * 1.15, base = 10, top = Math.max(...items.map(x => x.lv));
+    chs.classList.add('stk'); chs.style.height = (base + (top + 1) * lh) + 'px';
+    for (const x of items) {
+      x.sp.style.left = x.left + 'px'; x.sp.style.bottom = (base + x.lv * lh) + 'px';
+      const ln = document.createElement('i'); ln.style.left = (x.at * step + 2) + 'px'; ln.style.height = (base + x.lv * lh + 3) + 'px'; chs.append(ln);
+      dots[x.at]?.classList.add('hit');
+    }
+  }
+}
+let stackWait; addEventListener('resize', () => { clearTimeout(stackWait); stackWait = setTimeout(stackBars, 100); });
 let hero = null;
 const logoHost = document.createElement('div'); logoHost.className = 'logo'; logoHost.id = 'logo';
 function after() {
@@ -1514,7 +1540,7 @@ function after() {
   const el = editingEl();
   if (el) { el.focus({ preventScroll: true }); placeCaret(el, S.editing.caret ?? el.textContent.length); }
   if (S.composer) document.getElementById('cnote')?.focus();
-  spaceChords(); document.querySelectorAll('.desc').forEach(fitDesc);
+  spaceChords(); stackBars(); document.querySelectorAll('.desc').forEach(fitDesc);
   if (S.screen === 'song' && S.dev !== 'alumno') {
     if (S.pop) {
       const P = S.pop;
@@ -1895,7 +1921,6 @@ function handle(b, e, over) {
     p.songs.forEach(s => rowsOf(s).forEach(r => whoOfRow(s, r).includes(id) && s.changed.add(r.id))); render(); return true; }
   if ('mknew' in d) { makeTag(document.getElementById('tagq')?.value ?? ''); return true; }
   if ('setc' in d) { setChord(d.setc); render(); return true; }
-  if ('split' in d) { S.split = !S.split; render(); return true; }
   if ('delbar' in d) { const { row } = findRow(cur(), S.pop.row); pushHist(); row.bars.splice(S.pop.bar, 1); mark(row.id); if (!row.bars.length) { const l = findRow(cur(), row.id); l.sec.rows.splice(l.i, 1); } S.pop = null; render(); return true; }
   if (d.bar && e?.target?.closest?.('[data-addbar]')) return handle(null, e, { addbar: e.target.closest('[data-addbar]').dataset.addbar });
   if (d.repline) { S.sel = []; S.pop = S.pop?.type === 'rep' && S.pop.row === d.repline ? null : { type: 'rep', row: d.repline }; render(); return true; }
