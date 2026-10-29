@@ -39,6 +39,7 @@ export function Studio({ mode, me = null, data = null, open = null, next = null,
         me,
         data: mode === 'demo' ? loadLocal() : data,
         open,
+        invited: Boolean(next?.startsWith('/unirse/')),
         store: mode === 'studio' && sb ? supabaseStore(sb) : mode === 'demo' ? localStore() : null,
         signIn: async (email) => {
           if (!sb) return { error: 'sin conexión' };

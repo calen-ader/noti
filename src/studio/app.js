@@ -94,6 +94,13 @@ const melDur = (mel) => mel.reduce((a, [, d]) => a + d, 0) * 0.6;
 
 /* ---------------- builders + data ---------------- */
 let ME = boot.me?.name || 'Yo';
+// who decides who's in a project: whoever made it, or someone they made an organiser (the database checks too).
+// In the demo there's no database and you organise everything. Starting a project needs an invitation first.
+const ADMIN_CHECK = !!boot.store?.removeMember;
+const isAdmin = (p) => !ADMIN_CHECK || !p?.id || p.ownerId === boot.me?.id || p.roles?.[boot.me?.id] === 'organiza';
+const isOwner = (p) => !ADMIN_CHECK || p?.ownerId === boot.me?.id;
+const CAN_CREATE = boot.data?.canCreate !== false;
+const INVITE_ONLY = 'Para empezar un proyecto, primero sumate a uno con el link que te pasen.';
 // every project has its own cast: the people of a show and the groups they sing in (Todxs is a group too)
 const crew = (p) => p?.cast ?? { people: [], groups: [] };
 function nameOf(id) {
@@ -523,7 +530,7 @@ const KEEP = ['#sw', '.mainc > .scroll', '.rail', '.st .scroll', '.evp .eb', '.t
 function render() {
   const view = [S.dev, S.screen, S.pid, S.si, S.sView, S.sSong].join(':'), keep = KEEP.map(q => document.querySelector(q)?.scrollTop ?? 0);
   if (S.dev === 'alumno') stage.innerHTML = `<div class="app alumno" id="app">${S.preview ? '<div class="pvbar"><span>Así lo ven con el link</span><button class="b" data-unpreview>Volver a editar</button></div>' : ''}${alumno()}</div>`;
-  else stage.innerHTML = `<div class="app" id="app">${S.screen !== 'signin' ? `<div class="shell side-${effSide()}${S.peek ? ' peek' : ''}${S.peekAnim ? ' anim' : ''}">${railV()}<div class="mainc">${appView()}</div>${effSide() === 'asoma' && !S.peek ? '<div class="edge" data-edge aria-hidden="true"></div>' : ''}</div>` : appView()}</div>`;
+  else stage.innerHTML = `<div class="app${CAN_CREATE ? '' : ' nocreate'}" id="app">${S.screen !== 'signin' ? `<div class="shell side-${effSide()}${S.peek ? ' peek' : ''}${S.peekAnim ? ' anim' : ''}">${railV()}<div class="mainc">${appView()}</div>${effSide() === 'asoma' && !S.peek ? '<div class="edge" data-edge aria-hidden="true"></div>' : ''}</div>` : appView()}</div>`;
   S.peekAnim = false;
   const back = (from, to) => KEEP.slice(from, to).forEach((q, k) => { const el = document.querySelector(q); if (el && keep[from + k] && (view === lastView || q === '.rail')) el.scrollTop = keep[from + k]; });
   back(0, 4); after(); back(4, 6);
@@ -593,7 +600,7 @@ function signin() {
         <form class="form" id="signin"><label class="fl">Mail<input id="mail" type="email" required placeholder="vos@ejemplo.com" autocomplete="email" value="${esc(S.mail)}"></label>
         ${link ? '' : `<label class="fl">Contraseña<input id="pass" type="password" required minlength="6" autocomplete="${up ? 'new-password' : 'current-password'}"></label>`}
         <button class="b solid" type="submit"${S.sending ? ' disabled' : ''}>${S.sending ? 'Un momento…' : up ? 'Crear cuenta' : link ? 'Mandarme el link' : 'Entrar'}</button>${S.signErr ? `<p class="quiet">${esc(S.signErr)}</p>` : ''}</form>
-        <p class="alt">${up ? '<button type="button" data-amode="in">Ya tengo cuenta</button>' : '<button type="button" data-amode="up">Crear cuenta</button>'}<span>·</span>${link ? '<button type="button" data-amode="in">Entrar con contraseña</button>' : '<button type="button" data-amode="link">Entrar con un link por mail</button>'}</p>`}</div>
+        <p class="alt">${up ? '<button type="button" data-amode="in">Ya tengo cuenta</button><span>·</span>' : boot.invited ? '<button type="button" data-amode="up">Crear cuenta</button><span>·</span>' : ''}${link ? '<button type="button" data-amode="in">Entrar con contraseña</button>' : '<button type="button" data-amode="link">Entrar con un link por mail</button>'}</p>`}</div>
     ${S.sent ? '' : '<p class="hint">Si sos alumno o alumna, abrí el link que te pasaron.</p>'}</div>`;
 }
 function authErr(msg) {
@@ -624,8 +631,8 @@ function board() {
   const top = `<div class="top">${sideBtn()}<span class="crumbs"><span class="crumb cur">Inicio</span></span><span class="sp"></span></div>`;
   if (!PROJECTS.length) return `${top}<div class="scroll"><div class="board fresh">
     <header><h1 class="h1">Hola, ${esc(S.myName)}</h1><p class="lede">Todavía no hay nada acá.</p></header>
-    <div class="starters">${STARTERS.map(x => `<button class="starter" data-starter="${x.k}" style="--pc:${x.pc}"><span class="sg">${x.k === 'cal' ? calGlyph() : x.g}</span><span><b>${x.t}</b><small>${x.d}</small></span></button>`).join('')}</div>
-    <p class="hint">Si te pasaron un link, abrilo y aparece en Compartidos.</p>
+    ${CAN_CREATE ? `<div class="starters">${STARTERS.map(x => `<button class="starter" data-starter="${x.k}" style="--pc:${x.pc}"><span class="sg">${x.k === 'cal' ? calGlyph() : x.g}</span><span><b>${x.t}</b><small>${x.d}</small></span></button>`).join('')}</div>
+    <p class="hint">Si te pasaron un link, abrilo y aparece en Compartidos.</p>` : `<p class="hint">Noti es por invitación. Abrí el link que te pasó quien organiza el proyecto y te aparece acá.</p>`}
   </div></div>`;
   const list = PROJECTS.filter(p => S.filter === 'todos' || (S.filter === 'mios' ? p.owner === ME : p.owner !== ME));
   const up = upcoming().slice(0, 4);
@@ -728,7 +735,7 @@ function menuV() {
   if (M.kind === 'song') return `<div class="pop menu">${M.here ? '<button data-mact="sreh">Ensayar</button><button data-mact="sshare">Compartir</button>' : ''}<button data-mact="rename">Renombrar</button><button data-mact="dup">Duplicar</button>${PROJECTS.length > 1 ? '<button data-mact="move">Mover a…</button>' : ''}<button data-mact="del" class="danger">Borrar canción</button></div>`;
   if (M.kind === 'move') return `<div class="pop menu"><div class="mlab">Mover a</div>${PROJECTS.filter(x => x.id !== (M.pid || S.pid)).map(x => `<button class="mvp" data-moveto="${x.id}" style="--pc:${x.pc}"><i class="sq"></i>${esc(x.name || 'Sin nombre')}</button>`).join('')}</div>`;
   if (M.kind === 'share') return shareV();
-  return `<div class="pop menu">${proj(M.pid || S.pid)?.songs.length ? '<button data-mact="preh">Ensayar todo</button>' : ''}<button data-mact="prename">Renombrar</button><button data-mact="pdup">Duplicar</button><button data-mact="pdel" class="danger">Borrar proyecto</button></div>`;
+  return `<div class="pop menu">${proj(M.pid || S.pid)?.songs.length ? '<button data-mact="preh">Ensayar todo</button>' : ''}<button data-mact="prename">Renombrar</button><button data-mact="pdup">Duplicar</button>${isAdmin(proj(M.pid || S.pid)) ? '<button data-mact="pdel" class="danger">Borrar proyecto</button>' : ''}</div>`;
 }
 function project() {
   const p = proj(); const tab = S.ptab; const ed = S.editing?.kind === 'pname';
@@ -964,12 +971,16 @@ const searchV = () => `<div class="scrim srch"><div class="search" role="dialog"
 /* ---------------- share ---------------- */
 function shareV() {
   const p = proj(); const link = p.link ? `${location.origin}/m/${p.link}` : '', inv = `${location.origin}/unirse/${p.invite}`;
+  const admin = isAdmin(p), owner = isOwner(p);
+  // someone in the project (not you, not whoever made it): an organiser can take them out, the maker can make them an organiser
+  const acts = (u, r) => !admin || !u || u === boot.me?.id || !(u in (p.roles ?? {})) ? '' : `<span class="eda">${owner ? `<button data-mkrole="${u}">${r === 'organiza' ? 'Solo edita' : 'Que organice'}</button>` : ''}<button data-rmmember="${u}">Quitar</button></span>`;
   return `<div class="pop menu sharep"><div class="mlab">Para que edite</div>
-    <p class="shint">Mandale este link. Entra con su mail y el proyecto le aparece.</p>
+    ${admin ? `<p class="shint">Mandale este link. Entra con su mail y el proyecto le aparece.</p>
     <div class="lnk"><span>${esc(inv.replace(/^https?:\/\//, ''))}</span><button class="b" data-copy="${esc(inv)}">Copiar</button></div>
-    <div class="eds">${p.editors.map(([n, r]) => `<div class="edr"><i class="wsq">${esc(n[0])}</i><span>${esc(n)}${n === ME ? ' (vos)' : ''}</span><small>${esc(r)}</small></div>`).join('')}</div>
+    <button data-newinvite>Hacer un link nuevo</button>` : '<p class="shint">Para sumar a alguien, pedíselo a quien organiza el proyecto.</p>'}
+    <div class="eds">${p.editors.map(([n, r, u]) => `<div class="edr"><i class="wsq">${esc(n[0])}</i><span>${esc(n)}${n === ME ? ' (vos)' : ''}</span><small>${esc(r)}</small>${acts(u, r)}</div>`).join('')}</div>
     <div class="mlab">Con el link</div>
-    <label class="tgl"><span>Cualquiera con el link puede ver<small>${p.shared ? 'Sin cuenta. Ve lo publicado, no los borradores' : 'Apagado: solo lo ven quienes tienen acceso'}</small></span><input type="checkbox" id="stulink"${p.shared ? ' checked' : ''}><i></i></label>
+    <label class="tgl"><span>Cualquiera con el link puede ver<small>${p.shared ? 'Sin cuenta. Ve lo publicado, no los borradores' : 'Apagado: solo lo ven quienes tienen acceso'}</small></span><input type="checkbox" id="stulink"${p.shared ? ' checked' : ''}${admin ? '' : ' disabled'}><i></i></label>
     ${p.shared && link ? `<div class="lnk"><span>${esc(link.replace(/^https?:\/\//, ''))}</span><button class="b" data-copy="${esc(link)}">Copiar</button></div><button data-asstudent>Ver como lo ven con el link</button>` : ''}</div>`;
 }
 
@@ -1637,6 +1648,7 @@ document.addEventListener('click', (e) => {
 
 function handle(b, e, over) {
   const d = over ?? b.dataset;
+  if (('newproj' in d || d.starter && d.starter !== 'cal' || d.mact === 'pdup') && !CAN_CREATE) { S.menu = null; toast(INVITE_ONLY); return true; }
   if (d.look) { setLook(d.look); return true; }
   if (d.th) { setTheme(d.th); return true; }
   if ('peek' in d) { if (S.collapsed && !narrow()) { S.collapsed = false; S.peek = false; saveSide(); } else { S.peek = !S.peek; S.peekAnim = !!S.peek; } render(); return true; }
@@ -1670,7 +1682,7 @@ function handle(b, e, over) {
   if (d.calm) { const [y, m] = S.calMonth.split('-').map(Number); const dt = new Date(y, m - 1 + +d.calm, 1); S.calMonth = iso(dt).slice(0, 7); S.calSel = null; render(); return true; }
   if ('caltoday' in d) { S.calMonth = TODAY.slice(0, 7); S.calSel = TODAY; render(); return true; }
   if (d.calhide !== undefined) { S.calHide.has(d.calhide) ? S.calHide.delete(d.calhide) : S.calHide.add(d.calhide); render(); return true; }
-  if ('sharepop' in d) { const p = proj(); if (p && !p.invite) p.invite = token(); S.menu = S.menu?.kind === 'share' ? null : { kind: 'share' }; render(); return true; }
+  if ('sharepop' in d) { const p = proj(); if (p && !p.invite && isAdmin(p)) p.invite = token(); S.menu = S.menu?.kind === 'share' ? null : { kind: 'share' }; render(); return true; }
   if ('songmenu' in d) { S.menu = S.menu?.here ? null : { kind: 'song', here: true, i: S.si }; render(); return true; }
   if (d.moveto) { const M = S.menu; S.menu = null; const from = proj(M.pid || S.pid), to = proj(d.moveto), i = M.here ? S.si : M.i; const [x] = from.songs.splice(i, 1);
     to.songs.push(x); if (to.shared) rowsOf(x).forEach(r => x.changed.add(r.id)); if (from.shared) from.orderDirty = true; evs(from).forEach(ev => ev.songs = ev.songs.filter(id => id !== x.id));
@@ -1720,7 +1732,7 @@ function handle(b, e, over) {
     if (d.mact === 'dup') { const c = structuredClone(p.songs[M.i]); c.id = uid('s'); c.title = titleOf(p.songs[M.i]) + ' (copia)'; c.changed = new Set(rowsOf(c).map(r => r.id)); p.songs.splice(M.i + 1, 0, c); }
     if (d.mact === 'del') { const i = M.here ? S.si : M.i; const [x] = p.songs.splice(i, 1); S.trash = { kind: 'song', pid: p.id, i, item: x, bin: toBin('song', x, { pid: p.id, i }) }; p.orderDirty = true; if (M.here) S.screen = 'project'; toast(`Borraste “${titleOf(x)}”. Queda en la Papelera.`, true); return true; }
     if (d.mact === 'prename') { S.pid = p.id; S.screen = 'project'; S.editing = { kind: 'pname' }; }
-    if (d.mact === 'pdup') { const c = structuredClone(p); c.id = uid('p'); c.name = p.name + ' (copia)'; c.owner = ME; c.shared = false; c.link = undefined; c.invite = token(); c.editors = [[ME, 'organiza']]; c.songs = c.songs.map(x => ({ ...x, id: uid('s'), changed: new Set() })); snapshot(c); PROJECTS.splice(PROJECTS.indexOf(p) + 1, 0, c); S.pid = c.id; S.screen = 'project'; }
+    if (d.mact === 'pdup') { const c = structuredClone(p); c.id = uid('p'); c.name = p.name + ' (copia)'; c.owner = ME; c.ownerId = boot.me?.id; c.roles = {}; c.shared = false; c.link = undefined; c.invite = token(); c.editors = [[ME, 'organiza']]; c.songs = c.songs.map(x => ({ ...x, id: uid('s'), changed: new Set() })); snapshot(c); PROJECTS.splice(PROJECTS.indexOf(p) + 1, 0, c); S.pid = c.id; S.screen = 'project'; }
     if (d.mact === 'pdel') { const i = PROJECTS.indexOf(p); PROJECTS.splice(i, 1); S.trash = { kind: 'proj', i, item: p, bin: toBin('proj', p, { i }) }; S.screen = 'board'; toast(`Borraste “${p.name}”`, true); return true; }
     render(); return true;
   }
@@ -1742,6 +1754,17 @@ function handle(b, e, over) {
     const s = Song('', 'C', 90, '4/4', [Sec('', [L('')])]); s.keyAuto = true; p.songs.push(s); S.si = 0; S.screen = 'song'; S.hist = []; clearSel();
     if (d.starter === 'paste') { S.editing = { kind: 'row', id: s.secs[0].rows[0].id }; toast('Pegala acá: las partes se separan solas'); }
     else { S.composer = { at: s.secs[0].rows[0].id, mode: 'att' }; render(); }
+    return true;
+  }
+  if ('newinvite' in d) { const p = proj(); if (!isAdmin(p)) return true; p.invite = token(); toast('Listo. El link anterior ya no sirve.'); render(); return true; }
+  if (d.rmmember || d.mkrole) {
+    const p = proj(), u = d.rmmember || d.mkrole, ed = p.editors.find(x => x[2] === u);
+    const next = d.mkrole && (p.roles[u] === 'organiza' ? 'edita' : 'organiza');
+    (d.rmmember ? boot.store.removeMember(p.id, u) : boot.store.setRole(p.id, u, next)).then(() => {
+      if (d.rmmember) { p.editors = p.editors.filter(x => x !== ed); delete p.roles[u]; toast(`Sacaste a ${ed?.[0] ?? 'esa persona'} del proyecto`); }
+      else { p.roles[u] = next; if (ed) ed[1] = next; }
+      render();
+    }, () => toast('No se pudo. Probá de nuevo.'));
     return true;
   }
   if ('newproj' in d) {
@@ -2141,9 +2164,12 @@ function load(data) {
   for (const row of data.projects) {
     const doc = dec(row.doc) ?? {}, order = doc.order ?? [];
     const list = songsOf(row.id).map(x => ({ doc: dec(x.doc), v: x.version })).sort((a, b) => (order.indexOf(a.doc.id) + 1 || 1e6) - (order.indexOf(b.doc.id) + 1 || 1e6));
-    const members = data.members.filter(m => m.project_id === row.id && m.name !== doc.owner);
+    const all = data.members.filter(m => m.project_id === row.id);
+    // the name on the project may belong to someone who joined with the link (the project was made for them): show their real role
+    const named = all.find(m => m.name === doc.owner), members = all.filter(m => m !== named);
     const p = { ...doc, id: row.id, songs: list.map(x => x.doc), published: dec(row.published) ?? { version: 0, note: '', changed: new Set(), songs: [] },
-      editors: [[doc.owner || 'Sin nombre', 'organiza'], ...members.map(m => [m.name || 'Sin nombre', m.role])], tags: doc.tags ?? [] };
+      editors: [named ? [named.name, named.role, named.user_id] : [doc.owner || 'Sin nombre', 'organiza'], ...members.map(m => [m.name || 'Sin nombre', m.role, m.user_id])], tags: doc.tags ?? [],
+      ownerId: row.owner_id, roles: Object.fromEntries(all.map(m => [m.user_id, m.role])) };
     for (const x of p.songs) { x.changed ??= new Set(); nameParts(x); } // unnamed parts get their faint suggested names
     delete p.order; delete p.events;
     EVENTS.push(...(doc.events ?? []));
