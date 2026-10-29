@@ -479,9 +479,9 @@ function barsV(song, sec, r, student = false) {
     const tgt = S.pop?.type === 'chord' && S.pop.row === r.id && S.pop.bar === i;
     // chords share the bar evenly; a dot holds a step, so "C . . G" puts G on the fourth beat
     const slots = Array.from({ length: beats * 2 }, (_, k) => `<i${k % 2 ? ' class="and"' : ''}${student ? '' : ` data-slot="${k}"`}${tgt && S.pop.slot === k ? ' data-on' : ''}><b></b></i>`).join('');
-    return `<${tag} class="bar${sim ? ' sim' : ''}${empty ? ' empty' : ''}${tgt ? ' tgt' : ''}${rp && i === 0 ? ' rs' : ''}${rp && i === r.bars.length - 1 ? ' re' : ''}"${student ? '' : ` data-bar="${r.id}:${i}" id="e-${r.id}-b${i}" aria-label="Compás ${i + 1}"`}><span class="chs" style="--n:${sim || empty ? 1 : b.length};--k:${Math.max(1, b.filter(c => c !== '.').length)}">${sim ? '%' : empty ? '' : b.map(c => `<span>${c === '.' ? '' : esc(c)}</span>`).join('')}</span><span class="bt" style="--n:${beats * 2}">${slots}</span></${tag}>`;
+    return `<${tag} class="bar${sim ? ' sim' : ''}${empty ? ' empty' : ''}${tgt ? ' tgt' : ''}${rp && i === 0 ? ' rs' : ''}${rp && i === r.bars.length - 1 ? ' re' : ''}${i === r.bars.length - 1 ? ' last' : ''}"${student ? '' : ` data-bar="${r.id}:${i}" id="e-${r.id}-b${i}" aria-label="Compás ${i + 1}"`}><span class="chs" style="--n:${sim || empty ? 1 : b.length};--k:${Math.max(1, b.filter(c => c !== '.').length)}">${sim ? '%' : empty ? '' : b.map(c => `<span>${c === '.' ? '' : esc(c)}</span>`).join('')}</span><span class="bt" style="--n:${beats * 2}">${slots}</span>${!student && i === r.bars.length - 1 ? `<span class="addb" data-addbar="${r.id}" role="button" aria-label="Agregar compás" title="Agregar compás">+</span>` : ''}</${tag}>`;
   }).join('');
-  return `<div class="br${rp ? ' rp' : ''}" data-row="${r.id}">${student ? '' : gutV('row', r.id, rowShown(r.id))}<div class="bars">${cells}${rp ? `<span class="xrep" aria-label="Se repite ${r.rep} veces">×${r.rep}</span>` : ''}${student ? '' : `<button class="bar plus" data-addbar="${r.id}" aria-label="Agregar compás">+</button>`}</div>${commentsV(song, r.id, student)}${student ? '' : composerV(r.id)}</div>`;
+  return `<div class="br${rp ? ' rp' : ''}" data-row="${r.id}">${student ? '' : gutV('row', r.id, rowShown(r.id))}<div class="bars">${cells}${student ? (rp ? `<span class="xrep" aria-label="Se repite ${r.rep} veces">×${r.rep}</span>` : '') : `<button class="xrep${rp ? '' : ' off'}${S.pop?.type === 'rep' && S.pop.row === r.id ? ' on' : ''}" data-repline="${r.id}" aria-label="${rp ? `Se repite ${r.rep} veces` : 'Repetir la línea'}" title="Repetir la línea">×${rp ? r.rep : ''}</button>`}</div>${commentsV(song, r.id, student)}${student ? '' : composerV(r.id)}</div>`;
 }
 function lineV(song, r, colors, only) {
   const ed = S.editing?.kind === 'row' && S.editing.id === r.id;
@@ -710,6 +710,7 @@ function menuV() {
     return `<div class="pop menu">${lyric ? '<button data-mact="rowedit">Editar texto</button>' : ''}<button data-mact="rownote">Comentar</button><button data-mact="rowdup">Duplicar</button>${clip ? '<button data-mact="rowpaste">Pegar debajo</button>' : ''}
       ${l.i > 0 ? '<button data-mact="rowup">Subir</button>' : ''}${l.i < l.sec.rows.length - 1 ? '<button data-mact="rowdown">Bajar</button>' : ''}
       ${l.i > 0 ? '<button data-mact="rowsplit">Empezar una parte acá</button>' : ''}
+      ${lyric ? '' : `<div class="mlab">Repetir la línea</div>${repStep(l.row)}`}
       <button data-mact="rowdel" class="danger">Borrar</button></div>`;
   }
   if (M.kind === 'song') return `<div class="pop menu">${M.here ? '<button data-mact="sreh">Ensayar</button><button data-mact="sshare">Compartir</button>' : ''}<button data-mact="rename">Renombrar</button><button data-mact="dup">Duplicar</button>${PROJECTS.length > 1 ? '<button data-mact="move">Mover a…</button>' : ''}<button data-mact="del" class="danger">Borrar canción</button></div>`;
@@ -781,6 +782,8 @@ function selInner() {
     <button data-act="cut">Cortar</button><button data-act="copy">Copiar</button>${clip ? '<button data-act="paste">Pegar debajo</button>' : ''}`;
 }
 function toolbarV() { return `<div class="tb" role="toolbar" aria-label="Selección">${selInner()}</div>`; }
+// how many times a line of bars is played: − ×3 +
+const repStep = (r) => { const n = r.rep || 1; return `<div class="rrow"><button class="b" data-rrep="${r.id}|-1" aria-label="Menos veces"${n < 2 ? ' disabled' : ''}>−</button><b>×${n}</b><button class="b" data-rrep="${r.id}|1" aria-label="Más veces">+</button></div>`; };
 function popV() {
   const song = cur(); const P = S.pop;
   if (P.type === 'chord') {
@@ -789,7 +792,6 @@ function popV() {
     const at = P.slot != null ? `<p class="slotat">${EN ? 'Beat' : 'Tiempo'} ${Math.floor(P.slot / 2) + 1}${P.slot % 2 ? (EN ? ' and' : ' y') : ''}</p>` : '';
     return `<div class="pop">${at}<div class="cgrid">${pal.map(x => `<button data-setc="${esc(x.c)}"><b>${esc(x.c)}</b><small>${x.rn}</small></button>`).join('')}</div>
       <form class="otro" data-otro><input id="otro" placeholder="${P.bar != null && P.slot == null ? 'Escribí uno o varios: C G Am, o C . . G' : 'Escribí un acorde'}" aria-label="Escribí un acorde" autocomplete="off" autocapitalize="off" spellcheck="false"></form>
-      ${P.bar != null ? (() => { const n = findRow(song, P.row)?.row.rep || 1; return `<div class="prow rrow"><span>${EN ? 'Line repeats' : 'La línea se repite'}</span><button class="b" data-rrep="-1" aria-label="Menos veces"${n < 2 ? ' disabled' : ''}>−</button><b>×${n}</b><button class="b" data-rrep="1" aria-label="Más veces">+</button></div>`; })() : ''}
       <div class="prow">${isBar ? `<button class="b" data-setc="%">%</button><button class="b${S.split ? ' on' : ''}" data-split>Dos por compás</button><button class="b" data-delbar>Quitar compás</button>` : ''}<button class="b" data-setc="">Sin acorde</button></div></div>`;
   }
   if (P.type === 'singer') {
@@ -802,6 +804,7 @@ function popV() {
       ${list.length ? '' : '<p class="tempty">Escribí un nombre para crear la primera.</p>'}
       <div class="prow"><button class="b" data-paint="">Quitar etiqueta</button></div></div>`;
   }
+  if (P.type === 'rep') { const r = findRow(song, P.row)?.row; return r ? `<div class="pop reppop"><div class="mlab">Repetir la línea</div>${repStep(r)}</div>` : ''; }
   if (P.type === 'meta') return `<div class="pop">
       <div class="mrow"><span>Tono</span><button class="b" data-tr="-1" aria-label="Bajar">−</button><b>${keyName(song.key)}</b><button class="b" data-tr="1" aria-label="Subir">+</button></div>
       <div class="mrow"><span>Tempo</span><button class="b" data-bpm="-4" aria-label="Más lento">−</button><b>${song.bpm}</b><button class="b" data-bpm="4" aria-label="Más rápido">+</button></div>
@@ -1488,10 +1491,11 @@ function after() {
       if (P.bar != null) document.getElementById(`e-${P.row}-b${P.bar}`)?.scrollIntoView({ block: 'nearest' });
       const anchor = P.dock ? rectOf([document.querySelector('[data-tool="singer"]')])
         : P.type === 'meta' ? rectOf([document.querySelector('[data-pop="meta"]')])
+        : P.type === 'rep' ? rectOf([document.querySelector(`[data-repline="${P.row}"]`)])
         : P.bar != null ? rectOf([document.getElementById(`e-${P.row}-b${P.bar}`)])
         : P.type === 'chord' ? rectOf([document.getElementById(`e-${P.row}-${P.i}`)])
         : rectOf(S.sel.map(x => document.getElementById(`e-${x.row}-${x.i}`)));
-      place(popV(), anchor, P.type === 'meta' || P.bar != null ? 'below' : 'above');
+      place(popV(), anchor, P.type === 'meta' || P.type === 'rep' || P.bar != null ? 'below' : 'above');
       if ((P.type === 'singer' || P.type === 'chord') && matchMedia('(pointer: fine)').matches) document.getElementById(P.type === 'chord' ? 'otro' : 'tagq')?.focus({ preventScroll: true });
     } else if (S.sel.length && !S.tool && S.tbar !== 'isla') {
       const a = rectOf(S.sel.map(x => document.getElementById(`e-${x.row}-${x.i}`)));
@@ -1851,8 +1855,10 @@ function handle(b, e, over) {
   if ('setc' in d) { setChord(d.setc); render(); return true; }
   if ('split' in d) { S.split = !S.split; render(); return true; }
   if ('delbar' in d) { const { row } = findRow(cur(), S.pop.row); pushHist(); row.bars.splice(S.pop.bar, 1); mark(row.id); if (!row.bars.length) { const l = findRow(cur(), row.id); l.sec.rows.splice(l.i, 1); } S.pop = null; render(); return true; }
+  if (d.bar && e?.target?.closest?.('[data-addbar]')) return handle(null, e, { addbar: e.target.closest('[data-addbar]').dataset.addbar });
+  if (d.repline) { S.sel = []; S.pop = S.pop?.type === 'rep' && S.pop.row === d.repline ? null : { type: 'rep', row: d.repline }; render(); return true; }
   if (d.bar) { const [row, i] = d.bar.split(':'); const sl = e?.target?.closest?.('[data-slot]'); S.sel = []; S.pop = { type: 'chord', row, bar: +i, ...(sl ? { slot: +sl.dataset.slot } : {}) }; render(); return true; }
-  if (d.rrep) { const { row } = findRow(cur(), S.pop.row); pushHist(); const n = Math.max(1, Math.min(16, (row.rep || 1) + +d.rrep)); if (n > 1) row.rep = n; else delete row.rep; mark(row.id); render(); return true; }
+  if (d.rrep) { const [rid, by] = d.rrep.split('|'); const { row } = findRow(cur(), rid); pushHist(); const n = Math.max(1, Math.min(16, (row.rep || 1) + +by)); if (n > 1) row.rep = n; else delete row.rep; mark(row.id); render(); return true; }
   if (d.addbar) { const { row } = findRow(cur(), d.addbar); pushHist(); row.bars.push([]); mark(row.id); S.sel = []; S.pop = { type: 'chord', row: row.id, bar: row.bars.length - 1 }; render(); return true; }
   // comments
   if ('recstart' in d) { const at = S.composer.at; startRec(at); return true; }
