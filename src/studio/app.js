@@ -1,8 +1,12 @@
 // Noti's studio: the whole app as one plain module, ported from the v7 prototype. mount() draws into the
 // page's stage and gets from the page who is signed in, the data, and how to save it (see Studio.tsx).
 import { mountNotiHero } from '@/lib/logo/noti-hero';
+import { LANG, setLang, translateTree, watchTranslate } from './i18n';
+
+const EN = LANG === 'en';
 
 export function mount(stage, boot) {
+  watchTranslate(stage);
 const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 // ids are random: two people (or two devices) make blocks at the same time
 const uid = (p = 'r') => p + Math.random().toString(36).slice(2, 10);
@@ -30,7 +34,7 @@ function transKey(key, n) {
   const { root, minor } = parseKey(key); const r = md(root + n);
   return minor ? ['C','C#','D','Eb','E','F','F#','G','G#','A','Bb','B'][r] + 'm' : ['C','Db','D','Eb','E','F','F#','G','Ab','A','Bb','B'][r];
 }
-function keyName(key) { const { minor, name } = parseKey(key); return ES[name[0]] + (name[1] === '#' ? '♯' : name[1] === 'b' ? '♭' : '') + (minor ? ' menor' : ' mayor'); }
+function keyName(key) { const { minor, name } = parseKey(key); const acc = name[1] === '#' ? '♯' : name[1] === 'b' ? '♭' : ''; return EN ? name[0] + acc + (minor ? ' minor' : ' major') : ES[name[0]] + acc + (minor ? ' menor' : ' mayor'); }
 function palette(key) {
   const { root, minor } = parseKey(key);
   const deg = minor
@@ -97,19 +101,23 @@ function snapshot(p) {
 
 /* ---------------- dates ---------------- */
 // one calendar for everything; an event may belong to a project (its colour, its songs, its people) or to nobody
-const MES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-const MESL = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-const DIA = ['dom','lun','mar','mié','jue','vie','sáb'];
-const DIAL = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+const MES = EN ? ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'] : ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const MESL = EN ? ['January','February','March','April','May','June','July','August','September','October','November','December'] : ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const DIA = EN ? ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'] : ['dom','lun','mar','mié','jue','vie','sáb'];
+const DIAL = EN ? ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'] : ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
 const D = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
 const iso = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
 const addDays = (s, n) => { const dt = D(s); dt.setDate(dt.getDate() + n); return iso(dt); };
 const addMonths = (s, n) => { const dt = D(s); dt.setMonth(dt.getMonth() + n); return iso(dt); };
 const daysFrom = (s) => Math.round((D(s) - D(TODAY)) / 864e5);
-const dayShort = (s) => { const dt = D(s); return `${DIA[dt.getDay()]} ${dt.getDate()} ${MES[dt.getMonth()]}`; };
-const dayLong = (s) => { const dt = D(s); return `${DIAL[dt.getDay()]} ${dt.getDate()} de ${MESL[dt.getMonth()]}`; };
-const hora = (t) => !t ? '' : t.endsWith(':00') ? `${+t.slice(0, 2)} h` : `${+t.slice(0, 2)}.${t.slice(3)} h`;
-const rel = (s) => { const n = daysFrom(s); return n === 0 ? 'hoy' : n === 1 ? 'mañana' : n === -1 ? 'ayer' : n < 0 ? `hace ${-n} días` : n < 14 ? `en ${n} días` : `en ${Math.round(n / 7)} semanas`; };
+const dayShort = (s) => { const dt = D(s); return EN ? `${DIA[dt.getDay()]} ${MES[dt.getMonth()]} ${dt.getDate()}` : `${DIA[dt.getDay()]} ${dt.getDate()} ${MES[dt.getMonth()]}`; };
+const dayLong = (s) => { const dt = D(s); return EN ? `${DIAL[dt.getDay()]}, ${MESL[dt.getMonth()]} ${dt.getDate()}` : `${DIAL[dt.getDay()]} ${dt.getDate()} de ${MESL[dt.getMonth()]}`; };
+const hora = (t) => { if (!t) return ''; const h = +t.slice(0, 2), m = t.slice(3);
+  if (EN) return `${h % 12 || 12}${m === '00' ? '' : ':' + m} ${h < 12 ? 'am' : 'pm'}`;
+  return m === '00' ? `${h} h` : `${h}.${m} h`; };
+const rel = (s) => { const n = daysFrom(s);
+  if (EN) return n === 0 ? 'today' : n === 1 ? 'tomorrow' : n === -1 ? 'yesterday' : n < 0 ? `${-n} days ago` : n < 14 ? `in ${n} days` : `in ${Math.round(n / 7)} weeks`;
+  return n === 0 ? 'hoy' : n === 1 ? 'mañana' : n === -1 ? 'ayer' : n < 0 ? `hace ${-n} días` : n < 14 ? `en ${n} días` : `en ${Math.round(n / 7)} semanas`; };
 const TODAY = iso(new Date());
 function Ev(pid, date, time, o = {}) { return { id: uid('e'), pid: pid || '', date, time, title: o.title || '', place: o.place || '', songs: o.songs || [], who: o.who || [], note: o.note || '', noteAll: o.noteAll ?? true, series: o.series || null, repeat: o.repeat || '', star: !!o.star, remind: o.remind ?? 'dia', tell: o.tell ?? true }; }
 const evTitle = (e) => e.title || 'Sin título';
@@ -254,7 +262,7 @@ function colorsFor(song) {
 const tagColor = (p, id) => { if (!p?.id) return 'y'; const map = (p.colors ??= { todxs: 'y' }); return map[id] ??= pickColor(map); };
 function secColor(name) {
   const n = name.toLowerCase();
-  const known = [['intro','c'],['estrofa','g'],['verse','g'],['primera','g'],['estribillo','p'],['chorus','p'],['puente','o'],['riff','v'],['final','v'],['12','o']];
+  const known = [['intro','c'],['estrofa','g'],['verse','g'],['primera','g'],['estribillo','p'],['chorus','p'],['puente','o'],['bridge','o'],['riff','v'],['final','v'],['outro','v'],['12','o']];
   for (const [k, c] of known) if (n.startsWith(k)) return c;
   let h = 0; for (const ch of n.replace(/\d/g, '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return PALETTE[h % PALETTE.length];
 }
@@ -673,6 +681,7 @@ function meV() {
     <form class="mename" data-mename><label class="mlab" for="myname">Nombre</label><input id="myname" value="${esc(S.myName)}" autocomplete="off"></form>
     <div class="sws">${AVATARS.map(c => `<button class="swb${S.avatar === c ? ' on' : ''}" style="--h:${cv(c)}" data-avatar="${c}" aria-label="Color ${c}"></button>`).join('')}</div>
     <div class="mlab">Apariencia</div><span class="vsw mth" role="group">${[['system', 'Auto'], ['light', 'Claro'], ['dark', 'Oscuro']].map(([k, t]) => `<button class="b" data-th="${k}" aria-pressed="${curTheme() === k}">${t}</button>`).join('')}</span>
+    <div class="mlab">Idioma</div><span class="vsw mth" role="group">${[['es', 'Español'], ['en', 'English']].map(([k, t]) => `<button class="b" data-lang="${k}" aria-pressed="${LANG === k}">${t}</button>`).join('')}</span>
     <div class="mlab">Calendario</div>
     <label class="mrow2"><span>La semana empieza</span><select id="wkstart"><option value="1"${S.weekStart === 1 ? ' selected' : ''}>el lunes</option><option value="0"${S.weekStart === 0 ? ' selected' : ''}>el domingo</option></select></label>
     <hr>${boot.setPassword ? '<button data-setpass>Contraseña</button>' : ''}<button data-keys>Atajos de teclado</button>${boot.signOut ? '<button data-signout>Cerrar sesión</button>' : ''}</div>`;
@@ -843,7 +852,7 @@ function evRow({ e, p }, opt = {}) {
 function nextLine(p) {
   const n = nextEv(p), sh = nextStar(p);
   if (!n) return '';
-  return `<div class="nextl"><button class="nx" data-ev="${n.e.id}"><span class="ndl">Próximo</span><b>${esc(evTitle(n.e))}</b><span>${dayShort(n.e.date)}${n.e.time ? ', ' + hora(n.e.time) : ''}</span><span class="nrel">${rel(n.e.date)}</span></button>${sh && sh.e !== n.e ? `<span class="cdown">faltan <b>${daysFrom(sh.e.date)}</b> días para ${esc(evTitle(sh.e))}</span>` : ''}</div>`;
+  return `<div class="nextl"><button class="nx" data-ev="${n.e.id}"><span class="ndl">Próximo</span><b>${esc(evTitle(n.e))}</b><span>${dayShort(n.e.date)}${n.e.time ? ', ' + hora(n.e.time) : ''}</span><span class="nrel">${rel(n.e.date)}</span></button>${sh && sh.e !== n.e ? `<span class="cdown">${EN ? `<b>${daysFrom(sh.e.date)}</b> days until ${esc(evTitle(sh.e))}` : `faltan <b>${daysFrom(sh.e.date)}</b> días para ${esc(evTitle(sh.e))}`}</span>` : ''}</div>`;
 }
 
 /* ---------------- calendar ---------------- */
@@ -1073,8 +1082,11 @@ function alumno() {
 }
 
 /* ---------------- editing helpers ---------------- */
-function pushHist() { const s = cur(); S.hist.push({ sid: s.id, data: structuredClone({ secs: s.secs, main: s.main, ov: s.ov, notes: s.notes, replies: s.replies ?? {}, noteBy: s.noteBy ?? {}, clips: s.clips, changed: s.changed, key: s.key, title: s.title, bpm: s.bpm, ts: s.ts }) }); if (S.hist.length > 80) S.hist.shift(); }
-function undo() { const h = S.hist.pop(); if (!h) return; const s = proj().songs.find(x => x.id === h.sid); if (s) Object.assign(s, h.data); S.editing = null; clearSel(); }
+const histOf = (s) => structuredClone({ secs: s.secs, main: s.main, ov: s.ov, notes: s.notes, replies: s.replies ?? {}, noteBy: s.noteBy ?? {}, clips: s.clips, changed: s.changed, key: s.key, title: s.title, bpm: s.bpm, ts: s.ts });
+function pushHist() { const s = cur(); S.hist.push({ sid: s.id, data: histOf(s) }); S.fut = []; if (S.hist.length > 80) S.hist.shift(); }
+// undo and redo step through the same snapshots; any new change drops what could be redone
+function undo() { const h = S.hist.pop(); if (!h) return; const s = proj().songs.find(x => x.id === h.sid); if (s) { (S.fut ??= []).push({ sid: s.id, data: histOf(s) }); Object.assign(s, h.data); nameParts(s); } S.editing = null; clearSel(); }
+function redo() { const h = S.fut?.pop(); if (!h) return; const s = proj().songs.find(x => x.id === h.sid); if (s) { S.hist.push({ sid: s.id, data: histOf(s) }); Object.assign(s, h.data); nameParts(s); } S.editing = null; clearSel(); }
 const mark = (id) => cur().changed.add(id);
 function clearSel() { S.sel = []; S.selAnchor = null; S.pop = null; }
 
@@ -1112,6 +1124,7 @@ function applyLine(song, row, raw) {
 // Parts nobody named get a faint suggestion, never a name. A part whose words mostly repeat another's is a chorus; a short
 // part right before a chorus, a pre-chorus; a new part once two choruses have gone by, a bridge; bars alone, an intro or ending.
 // Pasted and typed names always win, and a suggestion only becomes a name when you tap Usar.
+const SUGG_EN = { Estrofa: 'Verse', Estribillo: 'Chorus', 'Pre-estribillo': 'Pre-chorus', Puente: 'Bridge', Interludio: 'Interlude', Final: 'Outro' };
 function nameParts(song) {
   const words = (s) => new Set(s.rows.filter(r => r.kind === 'lyric').flatMap(r => r.words.map(w => norm(w).replace(/[^a-zñ0-9]/g, ''))).filter(Boolean));
   const sim = (a, b) => { if (!a.size || !b.size) return 0; let n = 0; for (const w of a) if (b.has(w)) n++; return n / Math.min(a.size, b.size); };
@@ -1121,7 +1134,7 @@ function nameParts(song) {
   song.secs.forEach((s, i) => {
     s.sugg = '';
     if (chorus[i]) seen++;
-    if (s.name) { if (/^estrofa/i.test(s.name)) est++; return; }
+    if (s.name) { if (/^(estrofa|verse)/i.test(s.name)) est++; return; }
     if (song.secs.length < 2) return;
     const lyr = W[i].size > 0;
     if (!lyr) { if (s.rows.some(r => r.kind === 'bars')) s.sugg = i === 0 ? 'Intro' : i === song.secs.length - 1 ? 'Final' : 'Interludio'; return; }
@@ -1131,7 +1144,15 @@ function nameParts(song) {
     if (seen >= 2) { s.sugg = 'Puente'; return; }
     s.sugg = 'Estrofa ' + (++est);
   });
-  if (song.secs.filter(s => /^estrofa/i.test(s.name || s.sugg)).length === 1) song.secs.forEach(s => { if (s.sugg === 'Estrofa 1') s.sugg = 'Estrofa'; });
+  if (song.secs.filter(s => /^(estrofa|verse)/i.test(s.name || s.sugg)).length === 1) song.secs.forEach(s => { if (s.sugg === 'Estrofa 1') s.sugg = 'Estrofa'; });
+  if (EN) song.secs.forEach(s => { s.sugg = s.sugg.replace(/^(Estrofa|Estribillo|Pre-estribillo|Puente|Interludio|Final)/, (m) => SUGG_EN[m]); });
+}
+function editingText() { // what the open field held before any typing
+  const e = S.editing, song = cur();
+  if (e.kind === 'row') { const r = findRow(song, e.id)?.row; return r?.kind === 'lyric' ? r.words.join(' ') : ''; }
+  if (e.kind === 'sec') { const x = song.secs.find(z => z.id === e.id); return x ? x.name + (x.rep > 1 ? ` x${x.rep}` : '') + (x.ts ? ` ${x.ts}` : '') : ''; }
+  if (e.kind === 'title') return song.title;
+  return null;
 }
 function editingEl() {
   const e = S.editing; if (!e) return null;
@@ -1160,7 +1181,7 @@ function commitEditing() {
   }
   const loc = findRow(song, e.id); if (!loc) return true;
   const before = structuredClone({ secs: song.secs, main: song.main, ov: song.ov, notes: song.notes, clips: song.clips, changed: song.changed });
-  if (applyLine(song, loc.row, text)) { S.hist.push({ sid: song.id, data: before }); nameParts(song); autoKey(song); }
+  if (applyLine(song, loc.row, text)) { S.hist.push({ sid: song.id, data: before }); S.fut = []; nameParts(song); autoKey(song); }
   return true;
 }
 function wordOrder() { const out = []; for (const r of rowsOf(cur())) if (r.kind === 'lyric') r.words.forEach((_, i) => out.push({ row: r.id, i })); return out; }
@@ -1382,6 +1403,7 @@ function spaceChords() {
 let hero = null;
 const logoHost = document.createElement('div'); logoHost.className = 'logo'; logoHost.id = 'logo';
 function after() {
+  translateTree(stage); // in English, before anything below measures text
   const app = document.getElementById('app');
   const logo = document.getElementById('logo'); // the sign-in logo plays its intro once and stays put while the form changes
   if (logo && logo !== logoHost) { if (!hero) hero = mountNotiHero(logoHost, { intro: true }); logo.replaceWith(logoHost); }
@@ -1721,6 +1743,7 @@ function handle(b, e, over) {
   if ('resend' in d) { S.sent = false; render(); return true; }
   if (d.amode) { S.mail = document.getElementById('mail')?.value.trim() ?? S.mail; S.authMode = d.amode; S.signErr = ''; render(); document.getElementById(d.amode === 'link' ? 'mail' : 'pass')?.focus(); return true; }
   if ('google' in d) { S.signErr = ''; boot.google().then((err) => { if (err) { S.signErr = authErr(err); render(); } }); return true; }
+  if (d.lang) { if (d.lang !== LANG) { setLang(d.lang); flush().finally(() => location.reload()); } return true; }
   if ('setpass' in d) { S.menu = null; S.modal = 'pass'; render(); return true; }
   if ('pub' in d) { S.modal = 'pub'; render(); return true; }
   if ('close' in d) { S.modal = null; render(); return true; }
@@ -1830,7 +1853,11 @@ document.addEventListener('keydown', (e) => {
     if (e.key.toLowerCase() === 'v') { clearTimeout(pasteWait); pasteWait = setTimeout(pasteBelow, 80); return; } // the paste event normally gets there first
     e.preventDefault(); copySel(e.key.toLowerCase() === 'x'); return;
   }
-  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && !el.isContentEditable && !/^(INPUT|TEXTAREA)$/.test(el.tagName) && S.screen === 'song') { e.preventDefault(); undo(); render(); return; }
+  if ((e.metaKey || e.ctrlKey) && (e.key.toLowerCase() === 'z' || e.key.toLowerCase() === 'y') && S.screen === 'song' && S.dev !== 'alumno' && !/^(INPUT|TEXTAREA)$/.test(el.tagName)) {
+    // in an open line the browser undoes the typing first; once there's nothing typed left, the song's own undo takes over
+    if (el.isContentEditable && S.editing && flat(el.textContent) !== flat(editingText() ?? '')) return;
+    e.preventDefault(); S.slash = null; if (e.key.toLowerCase() === 'y' || e.shiftKey) redo(); else undo(); render(); return;
+  }
   if (e.key === 'Escape' && (S.sel.length || S.pop || S.composer || S.tool) && !el.isContentEditable) { clearSel(); S.composer = null; S.tool = null; render(); return; }
   if (!el.isContentEditable || !S.editing) return;
   const ed = S.editing;
