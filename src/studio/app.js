@@ -582,7 +582,8 @@ function signin() {
   return `<div class="signin"><div class="logo" id="logo"></div>
     <div class="form">${S.sent
       ? `<p class="big">${sent}</p><button class="b" type="button" data-resend>Volver</button>`
-      : `${boot.google ? `<button class="b gbtn" type="button" data-google>${GLOGO}<span>Seguir con Google</span></button><div class="or"><span>o</span></div>` : ''}
+      : !S.mailStep && boot.google && !S.signErr ? `<button class="b gbtn" type="button" data-google>${GLOGO}<span>Seguir con Google</span></button><button class="b mailbtn" type="button" data-mailstep>Seguir con mail</button>` // first only the two ways in; the fields come on the next step
+      : `${boot.google ? '<button class="back" type="button" data-mailback>‹ Volver</button>' : ''}
         <form class="form" id="signin"><label class="fl">Mail<input id="mail" type="email" required placeholder="vos@ejemplo.com" autocomplete="email" value="${esc(S.mail)}"></label>
         ${link ? '' : `<label class="fl">Contraseña<input id="pass" type="password" required minlength="6" autocomplete="${up ? 'new-password' : 'current-password'}"></label>`}
         <button class="b solid" type="submit"${S.sending ? ' disabled' : ''}>${S.sending ? 'Un momento…' : up ? 'Crear cuenta' : link ? 'Mandarme el link' : 'Entrar'}</button>${S.signErr ? `<p class="quiet">${esc(S.signErr)}</p>` : ''}</form>
@@ -1834,6 +1835,8 @@ function handle(b, e, over) {
   if ('unpreview' in d) { S.dev = devOf(); S.preview = false; S.sheet = null; render(); return true; }
   if ('signout' in d) { S.menu = null; flush().finally(() => boot.signOut()); return true; }
   if ('resend' in d) { S.sent = false; render(); return true; }
+  if ('mailstep' in d) { S.mailStep = true; render(); document.getElementById('mail')?.focus(); return true; }
+  if ('mailback' in d) { S.mailStep = false; S.signErr = ''; render(); return true; }
   if (d.amode) { S.mail = document.getElementById('mail')?.value.trim() ?? S.mail; S.authMode = d.amode; S.signErr = ''; render(); document.getElementById(d.amode === 'link' ? 'mail' : 'pass')?.focus(); return true; }
   if ('google' in d) { S.signErr = ''; boot.google().then((err) => { if (err) { S.signErr = authErr(err); render(); } }); return true; }
   if (d.lang) { if (d.lang !== LANG) { setLang(d.lang); flush().finally(() => location.reload()); } return true; }
