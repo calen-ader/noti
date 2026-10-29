@@ -92,7 +92,7 @@ const titleOf = (s) => s.title || 'Canción sin título';
 const PROJECTS = [], EVENTS = [];
 function snapshot(p) {
   const changed = new Set(); p.songs.forEach(s => s.changed.forEach(id => changed.add(id)));
-  p.published = { version: p.version, note: p.note, changed, songs: structuredClone(p.songs) };
+  p.published = { version: p.version, note: p.note, changed, songs: structuredClone(p.songs).map(({ desc, ...x }) => x) };
 }
 
 /* ---------------- dates ---------------- */
@@ -554,13 +554,31 @@ const sideBtn = () => `<button class="b sidebtn" data-peek aria-label="Mostrar l
 // whether the sidebar is hidden is remembered per device, not per account: a phone and a computer want different things
 const sideMem = () => { try { return JSON.parse(localStorage.getItem('noti-side') || '{}'); } catch { return {}; } };
 function saveSide() { try { const m = sideMem(); m[S.dev] = S.collapsed; localStorage.setItem('noti-side', JSON.stringify(m)); } catch {} }
+// sign in with Google, with a mail and a password, or with a link sent by mail (which also covers a forgotten password)
+const GLOGO = '<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.2 0 24 0 14.6 0 6.6 5.4 2.6 13.2l7.9 6.2C12.4 13.7 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 7l7.2 5.6c4.2-3.9 7.1-9.6 7.1-17.1z"/><path fill="#FBBC05" d="M10.5 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.9-6.2C1 16.5 0 20.1 0 24s1 7.5 2.6 10.8l7.9-6.2z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.2-5.6c-2 1.4-4.7 2.3-8.7 2.3-6.3 0-11.6-4.2-13.5-10l-7.9 6.2C6.6 42.6 14.6 48 24 48z"/></svg>';
 function signin() {
+  const m = S.authMode ?? 'in', up = m === 'up', link = m === 'link';
+  const sent = S.sent === 'confirm' ? `Te mandamos un mail a ${esc(S.mail)} para confirmar la cuenta. Es solo esta vez.` : `Te mandamos un link a ${esc(S.mail || 'tu mail')}. Abrilo en este mismo aparato.`;
   return `<div class="signin"><div class="logo" id="logo"></div>
-    <form class="form" id="signin">${S.sent
-      ? `<p class="big">Te mandamos un link a ${esc(S.mail || 'tu mail')}. Abrilo en este mismo aparato.</p><button class="b" type="button" data-resend>Usar otro mail</button>`
-      : `<label class="fl">Mail<input id="mail" type="email" required placeholder="vos@ejemplo.com" autocomplete="email" value="${esc(S.mail)}"></label>
-        <button class="b solid" type="submit"${S.sending ? ' disabled' : ''}>${S.sending ? 'Enviando…' : 'Entrar'}</button>${S.signErr ? `<p class="quiet">${esc(S.signErr)}</p>` : ''}`}</form>
+    <div class="form">${S.sent
+      ? `<p class="big">${sent}</p><button class="b" type="button" data-resend>Volver</button>`
+      : `${boot.google ? `<button class="b gbtn" type="button" data-google>${GLOGO}<span>Seguir con Google</span></button><div class="or"><span>o</span></div>` : ''}
+        <form class="form" id="signin"><label class="fl">Mail<input id="mail" type="email" required placeholder="vos@ejemplo.com" autocomplete="email" value="${esc(S.mail)}"></label>
+        ${link ? '' : `<label class="fl">Contraseña<input id="pass" type="password" required minlength="6" autocomplete="${up ? 'new-password' : 'current-password'}"></label>`}
+        <button class="b solid" type="submit"${S.sending ? ' disabled' : ''}>${S.sending ? 'Un momento…' : up ? 'Crear cuenta' : link ? 'Mandarme el link' : 'Entrar'}</button>${S.signErr ? `<p class="quiet">${esc(S.signErr)}</p>` : ''}</form>
+        <p class="alt">${up ? '<button type="button" data-amode="in">Ya tengo cuenta</button>' : '<button type="button" data-amode="up">Crear cuenta</button>'}<span>·</span>${link ? '<button type="button" data-amode="in">Entrar con contraseña</button>' : '<button type="button" data-amode="link">Entrar con un link por mail</button>'}</p>`}</div>
     ${S.sent ? '' : '<p class="hint">Si sos alumno o alumna, abrí el link que te pasaron.</p>'}</div>`;
+}
+function authErr(msg) {
+  const m = (msg || '').toLowerCase();
+  if (m.includes('invalid login')) return 'Mail o contraseña incorrectos. Si siempre entraste con un link, entrá así y creá tu contraseña desde tu perfil.';
+  if (m.includes('already registered')) return 'Ese mail ya tiene cuenta. Entrá con tu contraseña o con un link.';
+  if (m.includes('not confirmed')) return 'Falta confirmar el mail: abrí el que te mandamos.';
+  if (m.includes('password')) return 'La contraseña tiene que tener al menos 6 caracteres.';
+  if (m.includes('not authorized') || m.includes('sending')) return 'Por ahora los mails de Noti no llegan a todos. Creá tu cuenta con una contraseña.';
+  if (m.includes('rate limit') || m.includes('security purposes')) return 'Demasiados intentos seguidos. Esperá un minuto y probá de nuevo.';
+  if (m.includes('provider')) return 'Google todavía no está listo. Entrá con tu mail.';
+  return 'No pudimos entrar. Revisá el mail y probá de nuevo.';
 }
 function pubBtn(p) {
   if (!p.shared) return '';
@@ -657,7 +675,7 @@ function meV() {
     <div class="mlab">Apariencia</div><span class="vsw mth" role="group">${[['system', 'Auto'], ['light', 'Claro'], ['dark', 'Oscuro']].map(([k, t]) => `<button class="b" data-th="${k}" aria-pressed="${curTheme() === k}">${t}</button>`).join('')}</span>
     <div class="mlab">Calendario</div>
     <label class="mrow2"><span>La semana empieza</span><select id="wkstart"><option value="1"${S.weekStart === 1 ? ' selected' : ''}>el lunes</option><option value="0"${S.weekStart === 0 ? ' selected' : ''}>el domingo</option></select></label>
-    <hr><button data-keys>Atajos de teclado</button>${boot.signOut ? '<button data-signout>Cerrar sesión</button>' : ''}</div>`;
+    <hr>${boot.setPassword ? '<button data-setpass>Contraseña</button>' : ''}<button data-keys>Atajos de teclado</button>${boot.signOut ? '<button data-signout>Cerrar sesión</button>' : ''}</div>`;
 }
 function menuV() {
   const M = S.menu;
@@ -669,12 +687,14 @@ function menuV() {
       <div class="mlab">Color</div><div class="sws">${SWATCHES.map(c => `<button class="swb${secCol(sec) === c ? ' on' : ''}" style="--h:${cv(c)}" data-mact="seccol" data-as="${c}" aria-label="Color"></button>`).join('')}</div>
       <button data-mact="secrep">${sec.rep > 1 ? 'Cantar una vez' : 'Repetir ×2'}</button><button data-mact="secdup">Duplicar</button><button data-mact="secfold">${S.fold.has(sec.id) ? 'Desplegar' : 'Plegar'}</button>
       ${i > 0 ? '<button data-mact="secup">Subir</button>' : ''}${i < cur().secs.length - 1 ? '<button data-mact="secdown">Bajar</button>' : ''}
+      ${i > 0 ? '<button data-mact="secmerge">Unir con la de arriba</button>' : ''}
       <button data-mact="secdel" class="danger">Borrar sección</button></div>`;
   }
   if (M.kind === 'row') {
     const l = findRow(cur(), M.id); const lyric = l.row.kind === 'lyric';
-    return `<div class="pop menu">${lyric ? '<button data-mact="rowedit">Editar texto</button>' : ''}<button data-mact="rownote">Comentar</button><button data-mact="rowdup">Duplicar</button>
+    return `<div class="pop menu">${lyric ? '<button data-mact="rowedit">Editar texto</button>' : ''}<button data-mact="rownote">Comentar</button><button data-mact="rowdup">Duplicar</button>${clip ? '<button data-mact="rowpaste">Pegar debajo</button>' : ''}
       ${l.i > 0 ? '<button data-mact="rowup">Subir</button>' : ''}${l.i < l.sec.rows.length - 1 ? '<button data-mact="rowdown">Bajar</button>' : ''}
+      ${l.i > 0 ? '<button data-mact="rowsplit">Empezar una parte acá</button>' : ''}
       <button data-mact="rowdel" class="danger">Borrar</button></div>`;
   }
   if (M.kind === 'song') return `<div class="pop menu">${M.here ? '<button data-mact="sreh">Ensayar</button><button data-mact="sshare">Compartir</button>' : ''}<button data-mact="rename">Renombrar</button><button data-mact="dup">Duplicar</button>${PROJECTS.length > 1 ? '<button data-mact="move">Mover a…</button>' : ''}<button data-mact="del" class="danger">Borrar canción</button></div>`;
@@ -698,11 +718,14 @@ function project() {
       ${past.length ? `<details class="past"><summary>Pasados (${past.length})</summary>${past.map(x => evRow(x, { noProj: true })).join('')}</details>` : ''}`; }
   return `<div class="top">${sideBtn()}<span class="crumbs"><span class="crumb cur">${esc(p.name || 'Sin nombre')}</span></span><span class="sp"></span><button class="b" data-sharepop>Compartir</button>${pubBtn(p)}<button class="b more" data-pmenu aria-label="Opciones del proyecto">···</button></div>
   <div class="scroll"><div class="proj">
-    <header class="ph"><h1 class="h1" data-pname${ed ? ' contenteditable="plaintext-only" class="editing"' : ''} data-ph="Sin nombre">${esc(p.name)}</h1>${nextLine(p)}</header>
+    <header class="ph"><h1 class="h1" data-pname${ed ? ' contenteditable="plaintext-only" class="editing"' : ''} data-ph="Sin nombre">${esc(p.name)}</h1>${nextLine(p)}${descV('proj', p.desc, 'Notas del proyecto')}</header>
     <div class="tabrow"><nav class="tabs2" role="tablist">${[['canciones', 'Canciones'], ['fechas', 'Eventos'], ['personas', 'Personas']].map(([k, t]) => `<button class="b" role="tab" aria-selected="${tab === k}" data-ptab="${k}">${t}${k === 'fechas' && upcoming(p).length ? ` <small class="quiet0">${upcoming(p).length}</small>` : ''}</button>`).join('')}</nav>${tab === 'canciones' && p.songs.length ? vsw('sview', [['hojas', 'Hojas'], ['lista', 'Lista']]) : ''}</div>
     ${pane}
   </div></div>`;
 }
+// a free note under the title, for whoever edits; students never see it
+const fitDesc = (t) => { t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; };
+const descV = (k, v, ph) => `<textarea class="desc" data-desc="${k}" rows="1" placeholder="${ph}" aria-label="${ph}">${esc(v ?? '')}</textarea>`;
 function editor() {
   const p = proj(), song = cur(), colors = colorsFor(song), lanes = hasChords(song);
   const only = rowsOf(song).length === 1;
@@ -717,7 +740,7 @@ function editor() {
   return `<div class="top">${sideBtn()}<span class="crumbs"><button class="crumb" data-go="project">${esc(p.name)}</button><span class="sl">/</span><span class="crumb cur">${esc(titleOf(song))}</span></span><span class="sp"></span><button class="b wide" data-reh="song">Ensayar</button><button class="b wide" data-sharepop>Compartir</button><button class="b" data-undo ${S.hist.length ? '' : 'disabled'}>Deshacer</button>${pubBtn(p)}<button class="b more" data-songmenu aria-label="Opciones de la canción">···</button></div>
   <div class="ed${S.tbar === 'lateral' ? ' lat' : ''}"><div class="sheetwrap" id="sw"><div class="page">
     <header class="shead"><h1 class="title${ted ? ' editing' : ''}" data-title${ted ? ' contenteditable="plaintext-only"' : ''} data-ph="Sin título">${esc(song.title)}</h1>
-      ${props}${lanes ? `<button class="fact play${PLAY.song ? ' on' : ''}" data-playsong>${PLAY.song ? ICON.stop + ' Parar' : ICON.play + ' Escuchar'}</button>` : ''}</header>
+      ${props}${descV('song', song.desc, 'Notas de la canción')}${lanes ? `<button class="fact play${PLAY.song ? ' on' : ''}" data-playsong>${PLAY.song ? ICON.stop + ' Parar' : ICON.play + ' Escuchar'}</button>` : ''}</header>
     <div class="doc${lanes ? ' lanes' : ''}" id="doc">${song.secs.map(sec => secV(song, sec, colors, only)).join('')}</div>
     ${empty ? `<div class="starts"><button class="b" data-start="chords">+ Compases</button></div>` : ''}
   </div></div>${dockV()}</div>`;
@@ -739,7 +762,8 @@ function selInner() {
   const song = cur(); const tags = new Set(tagsOf(proj()));
   return `<button data-act="chord">Acorde</button><span class="sep"></span>
     <button data-act="singer">Etiqueta</button>${S.recent.filter(w => tags.has(w)).slice(0, 3).map(w => `<button class="sw" data-paint="${esc(w)}" aria-label="${esc(nameOf(w))}" title="${esc(nameOf(w))}"><i style="--h:${cv(colorPreview(song, w))}"></i></button>`).join('')}<span class="sep"></span>
-    <button data-act="note">Comentar</button><button data-act="edit">Editar</button>`;
+    <button data-act="note">Comentar</button><button data-act="edit">Editar</button><span class="sep"></span>
+    <button data-act="cut">Cortar</button><button data-act="copy">Copiar</button>${clip ? '<button data-act="paste">Pegar debajo</button>' : ''}`;
 }
 function toolbarV() { return `<div class="tb" role="toolbar" aria-label="Selección">${selInner()}</div>`; }
 function popV() {
@@ -777,7 +801,10 @@ function pubModal(p) {
 
 const nameModal = () => `<div class="scrim"><form class="modal" id="nameform"><h3>¿Cómo te llamás?</h3><p>Así te ven en los proyectos que compartís.</p>
   <input id="firstname" autocomplete="given-name" value="${esc(boot.me?.name ?? '')}" aria-label="Tu nombre"><div class="mbtns"><button class="b solid" type="submit">Listo</button></div></form></div>`;
-const keysModal = () => `<div class="scrim"><div class="modal"><h3>Atajos de teclado</h3><dl class="keys2">${[['⌘K', 'Buscar'], ['/', 'Insertar algo en una línea vacía'], ['Enter', 'Línea nueva; en una línea vacía, sección nueva'], ['⌘Z', 'Deshacer'], ['Esc', 'Cerrar o soltar la selección'], ['Espacio', 'Ensayo: correr o pausar'], ['← →', 'Ensayo: canción anterior o siguiente']].map(([k, t]) => `<dt><kbd>${k}</kbd></dt><dd>${t}</dd>`).join('')}</dl><div class="mbtns"><button class="b solid" data-close>Listo</button></div></div></div>`;
+const passModal = () => `<div class="scrim" data-close><form class="modal" id="passform"><h3>Contraseña</h3><p>Para entrar con tu mail sin esperar un link.</p>
+  <input id="newpass" type="password" minlength="6" required autocomplete="new-password" placeholder="Al menos 6 caracteres" aria-label="Contraseña nueva"><input type="email" value="${esc(boot.me?.email ?? '')}" autocomplete="username" hidden>
+  <div class="mbtns"><button class="b" type="button" data-close>Cancelar</button><button class="b solid" type="submit">Guardar</button></div></form></div>`;
+const keysModal = () => `<div class="scrim"><div class="modal"><h3>Atajos de teclado</h3><dl class="keys2">${[['⌘K', 'Buscar'], ['/', 'Insertar algo en una línea vacía'], ['Enter', 'Línea nueva; en una línea vacía, sección nueva'], ['⌫', 'Al principio de una parte: unirla con la de arriba'], ['⌘X ⌘C ⌘V', 'Cortar, copiar y pegar lo seleccionado, con acordes y etiquetas'], ['⌘Z', 'Deshacer'], ['Esc', 'Cerrar o soltar la selección'], ['Espacio', 'Ensayo: correr o pausar'], ['← →', 'Ensayo: canción anterior o siguiente']].map(([k, t]) => `<dt><kbd>${k}</kbd></dt><dd>${t}</dd>`).join('')}</dl><div class="mbtns"><button class="b solid" data-close>Listo</button></div></div></div>`;
 // B: a calendar subscription puts the events in the phone's own calendar and keeps them updated; the reminders then come from that calendar
 const subModal = () => `<div class="scrim"><div class="modal"><h3>Conectar con tu calendario</h3><p>Tus eventos aparecen en Google Calendar, Apple u Outlook y se actualizan solos.</p>
   <div class="lnk"><span>webcal://noti.app/cal/calen-7k2q.ics</span><button class="b" data-copy="noti.app/cal/calen-7k2q.ics">Copiar</button></div>
@@ -792,9 +819,9 @@ function paperOf(s) {
 }
 function folderV(p) {
   const n = nextEv(p);
-  return `<button class="folder" data-proj="${p.id}" style="--pc:${p.pc};--pf:${p.pf}"><span class="fback"></span>
+  return `<div class="fwrap" style="--pf:${p.pf}"><button class="folder" data-proj="${p.id}" style="--pc:${p.pc};--pf:${p.pf}"><span class="fback"></span>
     <span class="papers">${p.songs.slice(0, 3).reverse().map(paperOf).join('')}</span>
-    <span class="ffront">${n ? `<span class="fdate">${dayShort(n.e.date)}</span>` : ''}<span class="fname">${esc(p.name || 'Sin nombre')}${pdot(p)}</span><span class="fmeta">${pmeta(p)}</span></span></button>`;
+    <span class="ffront">${n ? `<span class="fdate">${dayShort(n.e.date)}</span>` : ''}<span class="fname">${esc(p.name || 'Sin nombre')}${pdot(p)}</span><span class="fmeta">${pmeta(p)}</span></span></button><button class="fmore" data-fmenu="${p.id}" aria-label="Opciones de ${esc(p.name || 'Sin nombre')}"${S.menu?.fold && S.menu.pid === p.id ? ' aria-expanded="true"' : ''}>···</button></div>`;
 }
 const foldersV = (list) => `<div class="folders">${list.map(folderV).join('')}<button class="folder add" data-newproj><span class="fback"></span><span class="ffront"><span class="fplus">+</span><span class="fname">Nuevo proyecto</span></span></button></div>`;
 // the songs of a project as sheets, numbered in running order; drag a sheet (or its number) to reorder
@@ -1175,6 +1202,61 @@ function paint(who) {
   clearSel();
 }
 
+/* cut, copy and paste: a run of selected words, across lines and parts, keeps its chords, tags and comments */
+let clip = null;
+const flat = (t) => t.replace(/\s+/g, ' ').trim();
+function pickWords(song, row, idx) {
+  const m = (o) => { const out = {}; idx.forEach((w, j) => { if (o?.[w] !== undefined) out[j] = structuredClone(o[w]); }); return out; };
+  return { kind: 'lyric', words: idx.map(w => row.words[w]), chords: m(row.chords), main: m(song.main[row.id]), ov: m(song.ov[row.id]) };
+}
+function keepWords(song, row, idx) { const c = pickWords(song, row, idx); row.words = c.words.length ? c.words : ['']; row.chords = c.chords; song.main[row.id] = c.main; song.ov[row.id] = c.ov; mark(row.id); }
+function wholeLine(song, row) {
+  const { id, ...rest } = structuredClone(row);
+  return { ...rest, main: structuredClone(song.main[id] ?? {}), ov: structuredClone(song.ov[id] ?? {}), note: song.notes[id], noteBy: song.noteBy?.[id], replies: structuredClone(song.replies?.[id]) };
+}
+function clipLine(song, c) { // a copied line back into the song, with an id of its own
+  const { main, ov, note, noteBy, replies, ...row } = structuredClone(c); row.id = uid();
+  if (main && Object.keys(main).length) song.main[row.id] = main; if (ov && Object.keys(ov).length) song.ov[row.id] = ov;
+  if (note) { song.notes[row.id] = note; if (noteBy) (song.noteBy ??= {})[row.id] = noteBy; if (replies) (song.replies ??= {})[row.id] = replies; }
+  mark(row.id); return row;
+}
+const lineText = (c) => c.kind === 'bars' ? barsText(c.bars) : c.words.join(' ').trim();
+// the lines the selection covers, first to last; a line only partly selected gives just those words
+function selLines(song) {
+  const by = new Map(); for (const { row, i } of S.sel) (by.get(row) ?? by.set(row, []).get(row)).push(i);
+  const all = rowsOf(song); const pos = [...by.keys()].map(id => all.findIndex(r => r.id === id)).filter(k => k >= 0); if (!pos.length) return [];
+  return all.slice(Math.min(...pos), Math.max(...pos) + 1).map(row => {
+    const idx = row.kind === 'lyric' ? (by.get(row.id) ?? row.words.map((_, k) => k)).sort((a, b) => a - b) : null;
+    const whole = !idx || idx.length >= row.words.length;
+    return { row, idx, whole, c: whole ? wholeLine(song, row) : pickWords(song, row, idx) };
+  });
+}
+function copySel(cut) {
+  const song = cur(); const lines = selLines(song); if (!lines.length) return;
+  clip = { items: lines.map(l => l.c), text: lines.map(l => lineText(l.c)).join('\n') };
+  navigator.clipboard?.writeText(clip.text).catch(() => {});
+  if (cut) {
+    pushHist();
+    for (const l of lines) {
+      if (!l.whole) { keepWords(song, l.row, l.row.words.map((_, k) => k).filter(k => !l.idx.includes(k))); continue; }
+      const f = findRow(song, l.row.id); f.sec.rows.splice(f.i, 1);
+      for (const t of ['main', 'ov', 'notes', 'noteBy', 'replies']) if (song[t]) delete song[t][l.row.id];
+    }
+    song.secs = song.secs.filter(s => s.rows.length); if (!song.secs.length) song.secs.push(Sec('', [L('')]));
+    song.secs.forEach(s => s.rows.forEach(r => mark(r.id))); nameParts(song); autoKey(song);
+  }
+  clearSel(); toast(cut ? 'Cortado' : 'Copiado');
+}
+// put the copied lines into a part, at a line's index; true when the text pasted is what was copied here
+function pasteClip(song, sec, at, text) {
+  if (!clip || (text != null && flat(text) !== flat(clip.text))) return false;
+  sec.rows.splice(at, 0, ...clip.items.map(c => clipLine(song, c))); return true;
+}
+function pasteBelow() {
+  const song = cur(); const last = selLines(song).at(-1)?.row ?? findRow(song, S.lastRow)?.row; if (!clip || !last) return;
+  pushHist(); const l = findRow(song, last.id); pasteClip(song, l.sec, l.i + 1); nameParts(song); autoKey(song); clearSel(); render();
+}
+
 /* recording */
 let recIv = 0, mediaRec = null, recChunks = [];
 async function startRec(at, label = 'Audio') {
@@ -1212,6 +1294,7 @@ function blockAct(M, a, as) {
     if (a === 'secas') { let n = as; if (as === 'Estrofa') { const k = song.secs.filter(x => x !== sec && /^estrofa/i.test(x.name)).length; n = k ? 'Estrofa ' + (k + 1) : 'Estrofa'; } sec.name = n; sec.auto = false; }
     if (a === 'secrep') sec.rep = sec.rep > 1 ? 1 : 2;
     if (a === 'secdup') { const c = structuredClone(sec); c.id = uid('s'); c.rows.forEach(r => { const o = r.id; r.id = uid(); for (const t of ['main', 'ov']) if (song[t][o]) song[t][r.id] = structuredClone(song[t][o]); mark(r.id); }); song.secs.splice(i + 1, 0, c); }
+    if (a === 'secmerge' && i > 0) { const prev = song.secs[i - 1]; prev.rows.push(...sec.rows); song.secs.splice(i, 1); prev.rows.forEach(r => mark(r.id)); nameParts(song); return render(); }
     if (a === 'secup' && i > 0) [song.secs[i - 1], song.secs[i]] = [song.secs[i], song.secs[i - 1]];
     if (a === 'secdown' && i < song.secs.length - 1) [song.secs[i + 1], song.secs[i]] = [song.secs[i], song.secs[i + 1]];
     sec.rows.forEach(r => mark(r.id));
@@ -1223,6 +1306,8 @@ function blockAct(M, a, as) {
   if (a === 'rownote') { S.composer = { at: row.id }; return render(); }
   if (a === 'rowrec') { S.composer = { at: row.id, mode: 'att' }; return render(); }
   pushHist();
+  if (a === 'rowsplit' && i > 0) { const ns = Sec('', sec.rows.splice(i)); ns.auto = true; song.secs.splice(song.secs.indexOf(sec) + 1, 0, ns); ns.rows.forEach(r => mark(r.id)); }
+  if (a === 'rowpaste') { pasteClip(song, sec, i + 1); autoKey(song); }
   if (a === 'rowdup') { const c = structuredClone(row); c.id = uid(); for (const t of ['main', 'ov']) if (song[t][row.id]) song[t][c.id] = structuredClone(song[t][row.id]); sec.rows.splice(i + 1, 0, c); mark(c.id); }
   if (a === 'rowup' && i > 0) { [sec.rows[i - 1], sec.rows[i]] = [sec.rows[i], sec.rows[i - 1]]; mark(row.id); }
   if (a === 'rowdown' && i < sec.rows.length - 1) { [sec.rows[i + 1], sec.rows[i]] = [sec.rows[i], sec.rows[i + 1]]; mark(row.id); }
@@ -1295,13 +1380,15 @@ function spaceChords() {
   }
 }
 let hero = null;
+const logoHost = document.createElement('div'); logoHost.className = 'logo'; logoHost.id = 'logo';
 function after() {
   const app = document.getElementById('app');
-  const logo = document.getElementById('logo');
-  if (logo && !logo.firstChild) { hero?.destroy?.(); hero = mountNotiHero(logo, { intro: true }); }
+  const logo = document.getElementById('logo'); // the sign-in logo plays its intro once and stays put while the form changes
+  if (logo && logo !== logoHost) { if (!hero) hero = mountNotiHero(logoHost, { intro: true }); logo.replaceWith(logoHost); }
   placeEye();
   if (S.modal === 'pub') app.insertAdjacentHTML('beforeend', pubModal(proj()));
   else if (S.modal === 'keys') app.insertAdjacentHTML('beforeend', keysModal());
+  else if (S.modal === 'pass') { app.insertAdjacentHTML('beforeend', passModal()); document.getElementById('newpass')?.focus(); }
   else if (S.modal === 'name') { app.insertAdjacentHTML('beforeend', nameModal()); document.getElementById('firstname')?.focus(); }
   else if (S.modal === 'subcal') app.insertAdjacentHTML('beforeend', subModal());
   if (S.conflict) app.insertAdjacentHTML('beforeend', `<div class="toast warn" role="alert">Alguien más cambió esto mientras editabas, y lo tuyo de ese momento no se guardó. <button data-reload>Recargar</button></div>`);
@@ -1309,7 +1396,7 @@ function after() {
   if (S.toast) app.insertAdjacentHTML('beforeend', `<div class="toast" role="status">${esc(S.toast)}${S.trash ? ' <button data-restore>Deshacer</button>' : ''}</div>`);
   if (S.menu) {
     const M = S.menu;
-    const q = M.kind === 'me' ? '[data-mepop]' : M.kind === 'share' ? '[data-sharepop]' : (M.kind === 'song' || M.kind === 'move') ? (M.here ? '[data-songmenu]' : `[data-smenu="${M.i}"]`) : M.kind === 'proj' ? (M.pid ? `[data-pmenu2="${M.pid}"]` : '[data-pmenu]') : M.kind === 'insert' ? `[data-plus="${M.at}"]` : `[data-handle="${M.kind}:${M.id}"]`;
+    const q = M.q ?? (M.kind === 'me' ? '[data-mepop]' : M.kind === 'share' ? '[data-sharepop]' : (M.kind === 'song' || M.kind === 'move') ? (M.here ? '[data-songmenu]' : `[data-smenu="${M.i}"]`) : M.kind === 'proj' ? (M.fold ? `[data-fmenu="${M.pid}"]` : M.pid ? `[data-pmenu2="${M.pid}"]` : '[data-pmenu]') : M.kind === 'insert' ? `[data-plus="${M.at}"]` : `[data-handle="${M.kind}:${M.id}"]`);
     const a = document.querySelector(q);
     if (a) place(menuV(), rectOf([a]), M.at === 'end:' || M.kind === 'me' ? 'above' : 'below'); else S.menu = null;
   }
@@ -1321,7 +1408,7 @@ function after() {
   const el = editingEl();
   if (el) { el.focus({ preventScroll: true }); placeCaret(el, S.editing.caret ?? el.textContent.length); }
   if (S.composer) document.getElementById('cnote')?.focus();
-  spaceChords();
+  spaceChords(); document.querySelectorAll('.desc').forEach(fitDesc);
   if (S.screen === 'song' && S.dev !== 'alumno') {
     if (S.pop) {
       const P = S.pop;
@@ -1429,11 +1516,22 @@ document.addEventListener('pointerup', (e) => { // only a real drag counts, neve
   if (moved) checkDragSelection();
 });
 function checkDragSelection() {
-  if (S.screen !== 'song' || S.dev === 'alumno' || S.editing) return;
+  if (S.screen !== 'song' || S.dev === 'alumno') return;
   const s = getSelection(); if (s.isCollapsed) return;
   const doc = document.getElementById('doc'); if (!doc || !doc.contains(s.anchorNode)) return;
-  const words = [...doc.querySelectorAll('.w')].filter(w => s.containsNode(w, true)); if (!words.length) return;
-  S.sel = words.map(w => ({ row: w.dataset.row, i: +w.dataset.i })); S.selAnchor = S.sel[0]; S.pop = null;
+  let extra = [];
+  if (S.editing) { // a drag that leaves the open line selects across lines, that line's picked words included
+    const ed = editingEl(); if (!ed || (ed.contains(s.anchorNode) && ed.contains(s.focusNode))) return;
+    const id = S.editing.kind === 'row' && S.editing.id; const r = s.getRangeAt(0); const txt = ed.textContent;
+    const a = ed.contains(r.startContainer) ? textOffset(ed, r.startContainer, r.startOffset) : 0, b = ed.contains(r.endContainer) ? textOffset(ed, r.endContainer, r.endOffset) : txt.length;
+    const spans = [...txt.matchAll(/\S+/g)].map(m => [m.index, m.index + m[0].length]);
+    const hit = s.containsNode(ed, true) ? spans.map(([x, y], k) => (x < b && y > a ? k : -1)).filter(k => k >= 0) : [];
+    commitEditing(); const row = id && findRow(cur(), id)?.row;
+    if (row?.kind === 'lyric') extra = hit.map(i => ({ row: id, i }));
+  }
+  const words = [...doc.querySelectorAll('.w')].filter(w => s.containsNode(w, true)); if (!words.length && !extra.length) return;
+  const order = wordOrder().map(x => x.row + ':' + x.i); const seen = new Set();
+  S.sel = [...words.map(w => ({ row: w.dataset.row, i: +w.dataset.i })), ...extra].filter(x => !seen.has(x.row + ':' + x.i) && seen.add(x.row + ':' + x.i)).sort((x, y) => order.indexOf(x.row + ':' + x.i) - order.indexOf(y.row + ':' + y.i)); S.selAnchor = S.sel[0]; S.pop = null;
   if (S.tool === 'singer' && S.brush !== undefined) paint(S.brush); // dragging with a singer picked paints the run
   else if (S.tool === 'chord') S.pop = { type: 'chord', row: S.sel[0].row, i: S.sel[0].i };
   s.removeAllRanges(); dragSel = true; render();
@@ -1452,7 +1550,7 @@ document.addEventListener('click', (e) => {
   const inOverlay = t.closest('.tb, .pop, .composer, .scrim, .pbar, .note, .evp, .search');
   const wasEditing = !inOverlay && commitEditing();
   const b = t.closest('button, label');
-  if (S.menu && !t.closest('.menu, [data-smenu], [data-pmenu], [data-pmenu2], [data-handle], [data-plus], [data-songmenu], [data-sharepop], [data-mepop]')) { S.menu = null; if (!b) return render(); }
+  if (S.menu && !t.closest('.menu, [data-smenu], [data-pmenu], [data-pmenu2], [data-fmenu], [data-handle], [data-plus], [data-songmenu], [data-sharepop], [data-mepop]')) { S.menu = null; if (!b) return render(); }
   if (S.ev && !t.closest('.evp, [data-ev], [data-newev], .pbar, .pop, .toast')) { S.ev = null; if (!b && !t.closest('[data-day]')) return render(); }
   if (S.peek && !t.closest('.rail, [data-peek], .pbar, .menu')) { S.peek = false; if (!b) return render(); }
   if (b && handle(b, e)) return;
@@ -1554,6 +1652,7 @@ function handle(b, e, over) {
   if (d.rehgo) { const k = S.reh.k + +d.rehgo; if (k >= 0 && k < S.reh.list.length) { S.reh.k = k; S.reh.y = 0; render(); } return true; }
   if (d.tog) { S.open.has(d.tog) ? S.open.delete(d.tog) : S.open.add(d.tog); render(); return true; }
   if (d.opensong) { const [pid, i] = d.opensong.split(':'); S.pid = pid; S.peek = false; openSong(+i); return true; }
+  if (d.fmenu) { S.menu = S.menu?.fold && S.menu.pid === d.fmenu ? null : { kind: 'proj', pid: d.fmenu, fold: true }; render(); return true; }
   if (d.pmenu2) { S.menu = S.menu?.kind === 'proj' && S.menu.pid === d.pmenu2 ? null : { kind: 'proj', pid: d.pmenu2 }; render(); return true; }
   if (d.newsong2) { S.pid = d.newsong2; S.open.add(d.newsong2); S.peek = false; return handle(b, e, { newsong: '' }); }
   if ('clear' in d) { clearSel(); render(); return true; }
@@ -1620,6 +1719,9 @@ function handle(b, e, over) {
   if ('unpreview' in d) { S.dev = devOf(); S.preview = false; S.sheet = null; render(); return true; }
   if ('signout' in d) { S.menu = null; flush().finally(() => boot.signOut()); return true; }
   if ('resend' in d) { S.sent = false; render(); return true; }
+  if (d.amode) { S.mail = document.getElementById('mail')?.value.trim() ?? S.mail; S.authMode = d.amode; S.signErr = ''; render(); document.getElementById(d.amode === 'link' ? 'mail' : 'pass')?.focus(); return true; }
+  if ('google' in d) { S.signErr = ''; boot.google().then((err) => { if (err) { S.signErr = authErr(err); render(); } }); return true; }
+  if ('setpass' in d) { S.menu = null; S.modal = 'pass'; render(); return true; }
   if ('pub' in d) { S.modal = 'pub'; render(); return true; }
   if ('close' in d) { S.modal = null; render(); return true; }
   if (d.copy) { flush(); try { navigator.clipboard.writeText(d.copy).then(() => toast('Link copiado'), () => toast(d.copy)); } catch { toast(d.copy); } return true; }
@@ -1652,6 +1754,8 @@ function handle(b, e, over) {
   }
   // selection toolbar
   if (d.act) {
+    if (d.act === 'cut' || d.act === 'copy') { copySel(d.act === 'cut'); return true; }
+    if (d.act === 'paste') { pasteBelow(); return true; }
     const first = S.sel[0];
     if (d.act === 'chord') S.pop = { type: 'chord', row: first.row, i: first.i };
     if (d.act === 'singer') S.pop = { type: 'singer' };
@@ -1722,6 +1826,10 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && S.ev && !/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) { S.ev = null; render(); return; }
   if (e.key === 'Escape' && /share|me/.test(S.menu?.kind ?? '')) { S.menu = null; render(); return; }
   if (e.key === 'Escape' && S.modal && S.modal !== 'pub') { S.modal = null; render(); return; }
+  if ((e.metaKey || e.ctrlKey) && /^[cxv]$/i.test(e.key) && S.sel.length && !el.isContentEditable && !/^(INPUT|TEXTAREA)$/.test(el.tagName) && S.screen === 'song' && S.dev !== 'alumno') {
+    if (e.key.toLowerCase() === 'v') { clearTimeout(pasteWait); pasteWait = setTimeout(pasteBelow, 80); return; } // the paste event normally gets there first
+    e.preventDefault(); copySel(e.key.toLowerCase() === 'x'); return;
+  }
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && !el.isContentEditable && !/^(INPUT|TEXTAREA)$/.test(el.tagName) && S.screen === 'song') { e.preventDefault(); undo(); render(); return; }
   if (e.key === 'Escape' && (S.sel.length || S.pop || S.composer || S.tool) && !el.isContentEditable) { clearSel(); S.composer = null; S.tool = null; render(); return; }
   if (!el.isContentEditable || !S.editing) return;
@@ -1782,6 +1890,10 @@ document.addEventListener('input', (e) => {
   S.editing.caret = caretOffset(e.target);
   if (S.editing.kind === 'row') { const m = e.target.textContent.match(/^\/(\S*)$/); S.slash = m ? { id: S.editing.id, q: m[1], active: S.slash?.q === m[1] ? S.slash.active : 0 } : null; slashMenu(e.target); }
 });
+document.addEventListener('input', (e) => {
+  const k = e.target.dataset?.desc; if (!k) return;
+  const v = e.target.value; if (k === 'song') cur().desc = v; else proj().desc = v; fitDesc(e.target); queueSave();
+});
 document.addEventListener('input', (e) => { // search, and the date panel's text fields, update in place so typing never loses focus
   const id = e.target.id;
   if (id === 'sq') { S.search.q = e.target.value; S.search.active = 0; document.getElementById('sres').innerHTML = resultsHTML(S.search.q); return; }
@@ -1794,9 +1906,38 @@ document.addEventListener('input', (e) => { // the tag search filters in place, 
   pop.querySelectorAll('.trow').forEach(r => { r.hidden = !r.dataset.tag.includes(q); if (r.dataset.tag === q) exact = true; });
   const nb = pop.querySelector('[data-mknew]'); nb.hidden = !q || exact; nb.innerHTML = `Crear <b>${esc(raw)}</b>`;
 });
+document.addEventListener('contextmenu', (e) => { // right-click a project, wherever it shows, for its menu
+  const t = e.target.closest?.('[data-proj]'); if (!t || S.dev === 'alumno' || !proj(t.dataset.proj)) return;
+  e.preventDefault(); commitEditing(); const id = t.dataset.proj;
+  S.menu = t.classList.contains('folder') ? { kind: 'proj', pid: id, fold: true } : { kind: 'proj', pid: id, q: `.${t.classList[0]}[data-proj="${id}"]` }; render();
+});
+let pasteWait = 0;
 document.addEventListener('paste', (e) => {
+  clearTimeout(pasteWait);
+  const t = e.clipboardData.getData('text/plain');
+  if (!S.editing && S.sel.length && S.screen === 'song' && S.dev !== 'alumno' && !/^(INPUT|TEXTAREA)$/.test(e.target.tagName)) { // words picked: paste under them
+    e.preventDefault(); if (!t.trim() || flat(t) === flat(clip?.text ?? '')) return pasteBelow();
+    const song = cur(); pushHist(); const l = findRow(song, selLines(song).at(-1).row.id);
+    const rows = parseBlocks(t).flatMap(b => b.rows); rows.forEach(r => mark(r.id)); l.sec.rows.splice(l.i + 1, 0, ...rows);
+    nameParts(song); autoKey(song); clearSel(); render(); return;
+  }
   const el = e.target.closest?.('[contenteditable]'); if (!el || S.editing?.kind !== 'row') return;
-  const t = e.clipboardData.getData('text/plain'); if (!t.includes('\n')) return;
+  { // lines copied here go back in whole, chords and tags included
+    const all = el.textContent, cc = caretOffset(el); const pre = all.slice(0, cc), post = all.slice(cc);
+    if (clip && flat(t) === flat(clip.text) && !(pre.trim() && post.trim() && clip.items.length === 1 && clip.items[0].kind === 'lyric')) {
+      e.preventDefault(); const song = cur(); const id = S.editing.id; pushHist(); applyLine(song, findRow(song, id).row, all);
+      const { sec, i, row } = findRow(song, id);
+      if (!pre.trim()) { pasteClip(song, sec, i); if (isEmptyRow(row)) sec.rows.splice(sec.rows.indexOf(row), 1); }
+      else if (!post.trim() || row.kind !== 'lyric') pasteClip(song, sec, i + 1);
+      else { // the caret splits the line: what follows it goes under the pasted lines
+        const k = flat(pre).split(' ').length, n = row.words.length, range = (a, b) => Array.from({ length: b - a }, (_, j) => a + j);
+        const rest = pickWords(song, row, range(k, n)); keepWords(song, row, range(0, k));
+        pasteClip(song, sec, i + 1); sec.rows.splice(i + 1 + clip.items.length, 0, clipLine(song, rest));
+      }
+      song.secs = song.secs.filter(x => x.rows.length); nameParts(song); autoKey(song); S.editing = null; render(); return;
+    }
+  }
+  if (!t.includes('\n')) return;
   e.preventDefault();
   const song = cur(); const id = S.editing.id; const text = el.textContent; const caret = caretOffset(el);
   pushHist(); const loc = findRow(song, id); applyLine(song, loc.row, text.slice(0, caret));
@@ -1829,8 +1970,12 @@ function parseBlocks(text) {
 }
 document.addEventListener('submit', (e) => {
   e.preventDefault(); const f = e.target;
-  if (f.id === 'signin') { S.mail = document.getElementById('mail').value.trim(); S.sending = true; S.signErr = ''; render();
-    boot.signIn(S.mail).then((err) => { S.sending = false; if (err) S.signErr = 'No pudimos mandar el link. Revisá el mail y probá de nuevo.'; else S.sent = true; render(); }); return; }
+  if (f.id === 'signin') { S.mail = document.getElementById('mail').value.trim(); const pw = document.getElementById('pass')?.value ?? ''; const m = S.authMode ?? 'in';
+    S.sending = true; S.signErr = ''; render();
+    (m === 'link' ? boot.signIn(S.mail) : m === 'up' ? boot.signUp(S.mail, pw) : boot.signInPassword(S.mail, pw)).then((r) => {
+      S.sending = false; if (r.error) S.signErr = authErr(r.error); else if (r.sent) S.sent = r.sent; render(); }); return; }
+  if (f.id === 'passform') { const v = document.getElementById('newpass').value; if (v.length < 6) return; f.querySelector('[type=submit]').disabled = true;
+    boot.setPassword(v).then((err) => { if (err) { toast(authErr(err)); return; } S.modal = null; toast('Listo. Ya podés entrar con tu mail y esta contraseña.'); }); return; }
   if (f.id === 'pubform') { const p = proj(); p.version++; p.note = document.getElementById('pubnote').value.trim(); snapshot(p); p.songs.forEach(s => s.changed = new Set()); p.orderDirty = false; S.modal = null; S.newsOpen = true; toast('Publicado'); return; }
   if (f.dataset.mename !== undefined) { setName(document.getElementById('myname').value); render(); return; }
   if (f.id === 'nameform') { const v = document.getElementById('firstname').value.trim(); if (!v) return; setName(v); S.modal = null; render(); return; }
@@ -1891,7 +2036,7 @@ let th = 'system', lk = 'cinta'; try { th = localStorage.getItem('noti-theme') |
 // as its own, and your profile. A version number per document catches two people saving the same thing at once.
 const enc = (x) => JSON.stringify(x, (k, v) => v instanceof Set ? { $set: [...v] } : v);
 const dec = (x) => x == null ? x : JSON.parse(JSON.stringify(x), (k, v) => v && typeof v === 'object' && Array.isArray(v.$set) ? new Set(v.$set) : v);
-const PKEYS = ['name', 'when', 'owner', 'pc', 'pf', 'people', 'shared', 'tags', 'cast', 'colors', 'version', 'note', 'orderDirty', 'link', 'invite'];
+const PKEYS = ['name', 'desc', 'when', 'owner', 'pc', 'pf', 'people', 'shared', 'tags', 'cast', 'colors', 'version', 'note', 'orderDirty', 'link', 'invite'];
 function projDoc(p) { const d = {}; for (const k of PKEYS) if (p[k] !== undefined) d[k] = p[k]; d.order = p.songs.map(x => x.id); d.events = EVENTS.filter(e => e.pid === p.id); return d; }
 const profDoc = () => [S.myName, { avatar: S.avatar, weekStart: S.weekStart, events: EVENTS.filter(e => !e.pid), recentS: S.recentS }];
 const saved = new Map(); // what the database has: key -> { json, v, conflict }
