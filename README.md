@@ -1,11 +1,7 @@
 # Noti
 
-Live song sheets for a vocal coach and an instrument teacher, shared with their students
-through one always-current link per show or per song.
-
-- **Euge (voice):** who sings which line or word, overlapping parts, notes, pen and audio.
-- **Guille (instruments):** typed chord charts drawn as bar grids.
-- **Students:** open a show link or a song link and see their parts. No accounts.
+A shared studio for song sheets: a vocal coach marks who sings each line, a guitar teacher adds
+chords, and students open one always-current link per project. No student accounts.
 
 Live: https://noti-rho.vercel.app (deploys from `main`)
 
@@ -27,7 +23,11 @@ On Vercel, add both env vars as Config (not Secret): `NEXT_PUBLIC_` values ship 
 
 ## Layout
 
-- `src/lib/sheet/` sheet model, paste clean-up, and re-anchoring of assignments when lyrics change
+- `src/studio/app.js` the whole studio as one plain module (ported from the v7 prototype), drawn into
+  the page by `src/studio/Studio.tsx`; `studio.css` its look; `store.ts` loading and saving
+- `src/app/` pages: sign-in (`/`), studio (`/estudio`), the student link (`/m/<token>`), the link to
+  join a project as an editor (`/unirse/<token>`), and `/demo` (example songs kept in the browser)
+- `supabase/migrations/0002_studio.sql` projects, songs, members and profiles, with versioned saves;
+  `0001` holds the first version's tables, no longer used by the app
 - `src/lib/logo/noti-hero.js` the animated wordmark (from the logo motion work, kept as one file)
-- `src/app/` pages: teacher sign-in hero, studio (`/estudio`), student links (`/m/<token>` show,
-  `/c/<token>` song), local demo (`/demo`)
+- `src/lib/sheet/` the first version's sheet model and its tests

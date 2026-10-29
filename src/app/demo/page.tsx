@@ -1,8 +1,6 @@
-import type { Metadata } from 'next';
-import { DemoShow } from './DemoShow';
+import { Studio } from '@/studio/Studio';
 
-export const metadata: Metadata = { title: 'Noti · prueba' };
-
+// The studio with invented example songs, kept in this browser tab only.
 export default function Demo() {
-  return <DemoShow />;
+  return <Studio mode="demo" me={{ id: 'demo', email: '', name: 'Calén' }} />;
 }

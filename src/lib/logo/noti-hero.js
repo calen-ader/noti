@@ -128,9 +128,11 @@ export function mountNotiHero(container, { intro = true, interactive = true, lab
     const f = hold(now - T.flinch, 70, 330, 260);
     const rs = hold(now - T.raise, 160, 700, 400);
     const h = sineInOut(seg(now, idleStart, idleStart + 500));
-    const sx = (1 - 0.14 * Math.abs(look.x) * h) * (1 + 0.1 * cb + 0.08 * f);
-    const sy = Math.max(0.04, (1 - 0.94 * cb) * (1 - 0.6 * q) * (1 - 0.94 * f));
-    tf(counter, `translate(${52 * look.x} ${(look.y > 0 ? 6 : 9) * look.y}) translate(608 340) scale(${sx} ${sy}) translate(-608 -340)`);
+    const strain = sineInOut(seg(Math.abs(look.y), 0.35, 1)) * h; // straining to look far up or down shrinks the eye a little
+    const shrink = 1 - 0.18 * strain;
+    const sx = (1 - 0.14 * Math.abs(look.x) * h) * (1 + 0.1 * cb + 0.08 * f) * shrink;
+    const sy = Math.max(0.04, (1 - 0.94 * cb) * (1 - 0.6 * q) * (1 - 0.94 * f) * shrink);
+    tf(counter, `translate(${52 * look.x} ${(look.y > 0 ? 6 + 12 * strain : 9 + 13 * strain) * look.y}) translate(608 340) scale(${sx} ${sy}) translate(-608 -340)`);
     tf(oPath, `translate(608 454) scale(${1 + 0.02 * cb + 0.03 * q + 0.06 * f} ${1 - 0.03 * cb - 0.04 * q - 0.1 * f}) translate(-608 -454)`);
     setBrow(look.x, look.y, -16 * rs + 6 * cb + 10 * q + 14 * f, -4 * rs + 6 * q + 7 * f);
     const hop = now - T.hop;
