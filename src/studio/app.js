@@ -114,8 +114,11 @@ function parseBars(str) {
   if (!str.includes('|')) return str.trim().split(/\s+/).filter(Boolean).map(c => c === '%' ? ['%'] : [c]);
   return str.split('|').map(s => s.trim()).filter(Boolean).map(s => s === '%' ? ['%'] : s === '-' || s === '·' ? [] : s.split(/\s+/));
 }
-function B(str) { return { id: uid(), kind: 'bars', bars: parseBars(str) }; }
-const barsText = (bars) => '| ' + bars.map(b => b.length ? b.join(' ') : '-').join(' | ') + ' |';
+// a line of bars can end in "x3": it's played that many times, the way it's marked at the end of a line on paper
+const repOf = (str) => { const m = str.match(/\s*[x×](\d{1,2})\s*$/i); return m ? { str: str.slice(0, m.index), rep: Math.max(1, Math.min(16, +m[1])) } : { str, rep: 1 }; };
+function B(str) { const { str: t, rep } = repOf(str); return { id: uid(), kind: 'bars', bars: parseBars(t), ...(rep > 1 ? { rep } : {}) }; }
+const barStr = (b) => b.map(x => x === '.' ? '·' : x).join(' ');
+const barsText = (bars, rep = 1) => '| ' + bars.map(b => b.length ? b.join(' ') : '-').join(' | ') + ' |' + (rep > 1 ? ` x${rep}` : '');
 function Sec(name, rows, o = {}) { return { id: uid('s'), name, rows, rep: o.rep || 1, ts: o.ts || null }; }
 function Song(title, key, bpm, ts, secs) { return { id: uid('g'), title, key, bpm, ts, secs, keyAuto: false, main: {}, ov: {}, notes: {}, clips: [], changed: new Set() }; }
 const titleOf = (s) => s.title || 'Canción sin título';
@@ -347,7 +350,7 @@ function guessKey(list) {
   }
   return best;
 }
-function songChords(song) { const out = []; for (const r of rowsOf(song)) { if (r.kind === 'bars') r.bars.forEach(b => b.forEach(c => c !== '%' && out.push(c))); else Object.keys(r.chords).map(Number).sort((a, b) => a - b).forEach(i => out.push(r.chords[i])); } return out; }
+function songChords(song) { const out = []; for (const r of rowsOf(song)) { if (r.kind === 'bars') r.bars.forEach(b => b.forEach(c => c !== '%' && c !== '.' && out.push(c))); else Object.keys(r.chords).map(Number).sort((a, b) => a - b).forEach(i => out.push(r.chords[i])); } return out; }
 function autoKey(song) { if (!song.keyAuto) return; const list = songChords(song); if (list.length >= 2) song.key = guessKey(list); }
 /* playback */
 function events(song) {
@@ -357,10 +360,11 @@ function events(song) {
     for (let k = 0; k < sec.rep; k++) {
       let prev = null;
       for (const r of sec.rows) {
-        if (r.kind === 'bars') r.bars.forEach((b, i) => {
+        if (r.kind === 'bars') for (let x = 0; x < (r.rep || 1); x++) r.bars.forEach((b, i) => {
           const chords = b[0] === '%' ? prev : b.length ? b : null; if (b.length && b[0] !== '%') prev = b;
-          const list = chords?.length ? chords : [null];
-          list.forEach(c => ev.push({ el: `e-${r.id}-b${i}`, c, beats: beats / list.length }));
+          const list = chords?.length ? chords : [null]; const step = beats / list.length;
+          list.forEach((c, k) => { const last = ev[ev.length - 1]; // a dot holds the chord before it for one more step
+            if (c === '.' && k > 0) last.beats += step; else ev.push({ el: `e-${r.id}-b${i}`, c: c === '.' ? null : c, beats: step }); });
         });
         else Object.keys(r.chords).map(Number).sort((a, b) => a - b).forEach(i => { ev.push({ el: `e-${r.id}-${i}`, c: r.chords[i], beats }); prev = [r.chords[i]]; });
       }
@@ -496,12 +500,14 @@ const rowShown = (id) => S.editing?.id === id || S.sel.some(x => x.row === id) |
 const beatsOf = (song, sec) => +(sec.ts ?? song.ts).split('/')[0];
 function barsV(song, sec, r, student = false) {
   const beats = beatsOf(song, sec); const tag = student ? 'div' : 'button';
-  const cells = r.bars.map((b, i) => {
+  const rp = r.rep > 1; const cells = r.bars.map((b, i) => {
     const sim = b[0] === '%', empty = !b.length;
     const tgt = S.pop?.type === 'chord' && S.pop.row === r.id && S.pop.bar === i;
-    return `<${tag} class="bar${sim ? ' sim' : ''}${empty ? ' empty' : ''}${tgt ? ' tgt' : ''}"${student ? '' : ` data-bar="${r.id}:${i}" id="e-${r.id}-b${i}" aria-label="Compás ${i + 1}"`}><span class="chs">${sim ? '%' : empty ? '' : b.map(c => `<span>${esc(c)}</span>`).join('')}</span><i class="bt">${'<b></b>'.repeat(beats)}</i></${tag}>`;
+    // chords share the bar evenly; a dot holds a step, so "C . . G" puts G on the fourth beat
+    const slots = Array.from({ length: beats * 2 }, (_, k) => `<i${k % 2 ? ' class="and"' : ''}${student ? '' : ` data-slot="${k}"`}${tgt && S.pop.slot === k ? ' data-on' : ''}><b></b></i>`).join('');
+    return `<${tag} class="bar${sim ? ' sim' : ''}${empty ? ' empty' : ''}${tgt ? ' tgt' : ''}${rp && i === 0 ? ' rs' : ''}${rp && i === r.bars.length - 1 ? ' re' : ''}"${student ? '' : ` data-bar="${r.id}:${i}" id="e-${r.id}-b${i}" aria-label="Compás ${i + 1}"`}><span class="chs" style="--n:${sim || empty ? 1 : b.length};--k:${Math.max(1, b.filter(c => c !== '.').length)}">${sim ? '%' : empty ? '' : b.map(c => `<span>${c === '.' ? '' : esc(c)}</span>`).join('')}</span><span class="bt" style="--n:${beats * 2}">${slots}</span></${tag}>`;
   }).join('');
-  return `<div class="br" data-row="${r.id}">${student ? '' : gutV('row', r.id, rowShown(r.id))}<div class="bars">${cells}${student ? '' : `<button class="bar plus" data-addbar="${r.id}" aria-label="Agregar compás">+</button>`}</div>${commentsV(song, r.id, student)}${student ? '' : composerV(r.id)}</div>`;
+  return `<div class="br${rp ? ' rp' : ''}" data-row="${r.id}">${student ? '' : gutV('row', r.id, rowShown(r.id))}<div class="bars">${cells}${rp ? `<span class="xrep" aria-label="Se repite ${r.rep} veces">×${r.rep}</span>` : ''}${student ? '' : `<button class="bar plus" data-addbar="${r.id}" aria-label="Agregar compás">+</button>`}</div>${commentsV(song, r.id, student)}${student ? '' : composerV(r.id)}</div>`;
 }
 function lineV(song, r, colors, only) {
   const ed = S.editing?.kind === 'row' && S.editing.id === r.id;
@@ -660,7 +666,7 @@ function miniSheetOf(s) {
     if (out.length >= 8) break; if (sec.name) out.push(`<span class="ms">${esc(sec.name)}</span>`);
     for (const r of sec.rows) {
       if (out.length >= 8) break;
-      if (r.kind === 'bars') out.push(`<span class="mb">${r.bars.map(b => `<i>${esc(b.join(' ') || '·')}</i>`).join('')}</span>`);
+      if (r.kind === 'bars') out.push(`<span class="mb">${r.bars.map(b => `<i>${esc(barStr(b) || '·')}</i>`).join('')}${r.rep > 1 ? `<i>×${r.rep}</i>` : ''}</span>`);
       else if (!isEmptyRow(r)) out.push(`<span class="ml">${r.words.map((w, i) => { const who = s.main[r.id]?.[i]; return who ? `<i style="--h:${cv(colors[who])}">${esc(w)} </i>` : esc(w) + ' '; }).join('')}</span>`);
     }
   }
@@ -805,9 +811,11 @@ function popV() {
   const song = cur(); const P = S.pop;
   if (P.type === 'chord') {
     const pal = palette(song.key).concat(S.custom.map(c => ({ c, rn: '' })));
-    const isBar = P.bar != null;
-    return `<div class="pop"><div class="cgrid">${pal.map(x => `<button data-setc="${esc(x.c)}"><b>${esc(x.c)}</b><small>${x.rn}</small></button>`).join('')}</div>
-      <form class="otro" data-otro><input id="otro" placeholder="Escribí un acorde" aria-label="Escribí un acorde" autocomplete="off" autocapitalize="off" spellcheck="false"></form>
+    const isBar = P.bar != null && P.slot == null;
+    const at = P.slot != null ? `<p class="slotat">${EN ? 'Beat' : 'Tiempo'} ${Math.floor(P.slot / 2) + 1}${P.slot % 2 ? (EN ? ' and' : ' y') : ''}</p>` : '';
+    return `<div class="pop">${at}<div class="cgrid">${pal.map(x => `<button data-setc="${esc(x.c)}"><b>${esc(x.c)}</b><small>${x.rn}</small></button>`).join('')}</div>
+      <form class="otro" data-otro><input id="otro" placeholder="${P.bar != null && P.slot == null ? 'Escribí uno o varios: C G Am, o C . . G' : 'Escribí un acorde'}" aria-label="Escribí un acorde" autocomplete="off" autocapitalize="off" spellcheck="false"></form>
+      ${P.bar != null ? (() => { const n = findRow(song, P.row)?.row.rep || 1; return `<div class="prow rrow"><span>${EN ? 'Line repeats' : 'La línea se repite'}</span><button class="b" data-rrep="-1" aria-label="Menos veces"${n < 2 ? ' disabled' : ''}>−</button><b>×${n}</b><button class="b" data-rrep="1" aria-label="Más veces">+</button></div>`; })() : ''}
       <div class="prow">${isBar ? `<button class="b" data-setc="%">%</button><button class="b${S.split ? ' on' : ''}" data-split>Dos por compás</button><button class="b" data-delbar>Quitar compás</button>` : ''}<button class="b" data-setc="">Sin acorde</button></div></div>`;
   }
   if (P.type === 'singer') {
@@ -839,7 +847,7 @@ const nameModal = () => `<div class="scrim"><form class="modal" id="nameform"><h
 const passModal = () => `<div class="scrim" data-close><form class="modal" id="passform"><h3>Contraseña</h3><p>Para entrar con tu mail sin esperar un link.</p>
   <input id="newpass" type="password" minlength="6" required autocomplete="new-password" placeholder="Al menos 6 caracteres" aria-label="Contraseña nueva"><input type="email" value="${esc(boot.me?.email ?? '')}" autocomplete="username" hidden>
   <div class="mbtns"><button class="b" type="button" data-close>Cancelar</button><button class="b solid" type="submit">Guardar</button></div></form></div>`;
-const keysModal = () => `<div class="scrim"><div class="modal"><h3>Atajos de teclado</h3><dl class="keys2">${[['⌘K', 'Buscar'], ['/', 'Insertar algo en una línea vacía'], ['Enter', 'Línea nueva; en una línea vacía, sección nueva'], ['⌫', 'Al principio de una parte: unirla con la de arriba'], ['⌘X ⌘C ⌘V', 'Cortar, copiar y pegar lo seleccionado, con acordes y etiquetas'], ['⌘Z ⇧⌘Z', 'Deshacer y rehacer'], ['Esc', 'Cerrar o soltar la selección'], ['A–G', 'Con un acorde abierto: escribirlo (am7, f#, bb/d) y Enter'], ['Tab ⇧Tab', 'Acordes: siguiente o anterior palabra o compás'], ['1–8', 'Acordes: los del tono, en orden'], ['Espacio', 'Ensayo: correr o pausar'], ['← →', 'Ensayo: canción anterior o siguiente']].map(([k, t]) => `<dt><kbd>${k}</kbd></dt><dd>${t}</dd>`).join('')}</dl><div class="mbtns"><button class="b solid" data-close>Listo</button></div></div></div>`;
+const keysModal = () => `<div class="scrim"><div class="modal"><h3>Atajos de teclado</h3><dl class="keys2">${[['⌘K', 'Buscar'], ['/', 'Insertar algo en una línea vacía'], ['Enter', 'Línea nueva; en una línea vacía, sección nueva'], ['⌫', 'Al principio de una parte: unirla con la de arriba'], ['⌘X ⌘C ⌘V', 'Cortar, copiar y pegar lo seleccionado, con acordes y etiquetas'], ['⌘Z ⇧⌘Z', 'Deshacer y rehacer'], ['Esc', 'Cerrar o soltar la selección'], ['A–G', 'Con un acorde abierto: escribirlo (am7, f#, bb/d) y Enter'], ['Tab ⇧Tab', 'Acordes: siguiente o anterior palabra o compás'], ['C . . G', 'En un compás: varios acordes; cada punto ocupa un tiempo'], ['x3', 'En un compás: la línea se repite 3 veces'], ['1–8', 'Acordes: los del tono, en orden'], ['Espacio', 'Ensayo: correr o pausar'], ['← →', 'Ensayo: canción anterior o siguiente']].map(([k, t]) => `<dt><kbd>${k}</kbd></dt><dd>${t}</dd>`).join('')}</dl><div class="mbtns"><button class="b solid" data-close>Listo</button></div></div></div>`;
 // B: a calendar subscription puts the events in the phone's own calendar and keeps them updated; the reminders then come from that calendar
 const subModal = () => `<div class="scrim"><div class="modal"><h3>Conectar con tu calendario</h3><p>Tus eventos aparecen en Google Calendar, Apple u Outlook y se actualizan solos.</p>
   <div class="lnk"><span>webcal://noti.app/cal/calen-7k2q.ics</span><button class="b" data-copy="noti.app/cal/calen-7k2q.ics">Copiar</button></div>
@@ -1008,7 +1016,7 @@ function rehV() {
   const R = S.reh, s = rehAt(R.k); if (!s) { S.reh = null; return ''; }
   const colors = colorsFor(s), lanes = hasChords(s), nx = rehAt(R.k + 1);
   const body = s.secs.map(sec => `<section class="rsec">${sec.name ? `<div class="rsn" style="--h:${cv(secCol(sec))}">${esc(sec.name)}${sec.rep > 1 ? ` ×${sec.rep}` : ''}</div>` : ''}${s.notes[sec.id] ? `<p class="rnote">${esc(s.notes[sec.id])}</p>` : ''}
-    ${sec.rows.map(r => r.kind === 'bars' ? `<div class="rbars">${r.bars.map(b => `<span>${esc(b.join(' ') || '·')}</span>`).join('')}</div>` : isEmptyRow(r) ? ''
+    ${sec.rows.map(r => r.kind === 'bars' ? `<div class="rbars">${r.bars.map(b => `<span>${esc(barStr(b) || '·')}</span>`).join('')}${r.rep > 1 ? `<b class="xrep">×${r.rep}</b>` : ''}</div>` : isEmptyRow(r) ? ''
       : `<p class="rl2">${r.words.map((w, i) => { const who = s.main[r.id]?.[i], o = s.ov[r.id]?.[i], st = (who ? `--h:${cv(colors[who])};` : '') + (o ? `--h2:${cv(colors[o.who])}` : '');
         return `<span class="rw${who ? ' on' : ''}${o ? ' ov' : ''}"${st ? ` style="${st}"` : ''}><i>${r.chords[i] ? esc(r.chords[i]) : ''}</i><span class="ww">${esc(w)}${i < r.words.length - 1 ? ' ' : ''}</span></span>`; }).join('<wbr>')}</p>${s.notes[r.id] ? `<p class="rnote">${esc(s.notes[r.id])}</p>` : ''}`).join('')}</section>`).join('');
   return `<div class="reh${lanes ? ' lanes' : ''}" role="dialog" aria-label="Ensayo"><div class="rtop"><button class="rb" data-rehx aria-label="Salir del ensayo">×</button><span class="rt"><b>${esc(titleOf(s))}</b><small>${R.list.length > 1 ? `${R.k + 1} de ${R.list.length} · ` : ''}${lanes ? keyName(s.key) + ' · ' : ''}${s.bpm} bpm</small></span><span class="sp"></span>
@@ -1147,7 +1155,7 @@ function applyLine(song, row, raw) {
   if (row.kind !== 'lyric') return false;
   const asBars = text.includes('|') || (isChordLine(text) && text.split(' ').length >= 2);
   if (!asBars && text === row.words.join(' ').trim()) return false;
-  if (asBars) { row.kind = 'bars'; row.bars = parseBars(text); delete row.words; delete row.chords; delete song.main[row.id]; delete song.ov[row.id]; }
+  if (asBars) { const t = repOf(text); row.kind = 'bars'; row.bars = parseBars(t.str); if (t.rep > 1) row.rep = t.rep; delete row.words; delete row.chords; delete song.main[row.id]; delete song.ov[row.id]; }
   else remapLine(song, row, text ? text.split(' ') : ['']);
   mark(row.id); return true;
 }
@@ -1224,7 +1232,11 @@ const isSel = (row, i) => S.sel.some(x => x.row === row && x.i === i);
 /* chords + parts */
 function setChord(c) {
   const song = cur(); const P = S.pop; pushHist();
-  if (P.bar != null) {
+  if (P.bar != null && P.slot != null) { // a chord on one beat or "and": the rest of the bar stays where it was
+    const { row, sec } = findRow(song, P.row); row.bars[P.bar] = putOnSlot(row.bars[P.bar], P.slot, c === '%' ? '' : c, beatsOf(song, sec) * 2); mark(row.id); S.pop = null;
+  } else if (P.bar != null && Array.isArray(c)) { // typed in one go: "C G Am", or "C . . G"
+    const { row } = findRow(song, P.row); row.bars[P.bar] = c; mark(row.id); P.bar++; if (P.bar >= row.bars.length) row.bars.push([]); c = c.find(x => x !== '.');
+  } else if (P.bar != null) {
     const { row } = findRow(song, P.row); const b = row.bars[P.bar];
     if (c === '') row.bars[P.bar] = [];
     else if (c === '%') row.bars[P.bar] = ['%'];
@@ -1242,6 +1254,22 @@ function setChord(c) {
   autoKey(song);
 }
 // a chord as typed: "am7", "f#", "bb/d", "C♯m" all come out as written on a chart
+// put a chord on step k of a bar cut into n steps (eighths), then write it as short as it goes
+function putOnSlot(bar, k, c, n) {
+  const src = bar[0] === '%' ? [] : bar; const g = Array(n).fill('.');
+  src.forEach((x, j) => { const at = Math.round(j * n / src.length); if (at < n && x !== '.') g[at] = x; });
+  g[k] = c || '.';
+  let out = g; while (out.length % 2 === 0 && out.length > 1 && out.every((x, j) => j % 2 === 0 || x === '.')) out = out.filter((_, j) => j % 2 === 0);
+  return out.every(x => x === '.') ? [] : out;
+}
+// what was typed in the chord box: one chord, or for a bar several ("C G Am", "C . . G"); null if something isn't a chord
+function typed(v, bar) {
+  const parts = v.trim().replace(/[♯]/g, '#').replace(/[♭]/g, 'b').split(/\s+/).filter(Boolean);
+  if (parts.length === 1) { const c = normChord(parts[0]); return c === '.' ? null : c; }
+  if (!bar || parts.length > 16) return null;
+  const list = parts.map(x => x === '.' || x === '·' ? '.' : normChord(x));
+  return list.some(x => !x || x === '%' || x === '-') || list.every(x => x === '.') ? null : list;
+}
 function normChord(v) {
   v = v.trim().replace(/\s+/g, '').replace(/♯/g, '#').replace(/♭/g, 'b');
   if (v === '-' || v === '%') return v;
@@ -1250,7 +1278,7 @@ function normChord(v) {
 }
 // Tab and the arrows in the chord box: on to the next word or bar (or back), across lines
 function stepChord(d) {
-  const song = cur(); const P = S.pop; const { row } = findRow(song, P.row);
+  const song = cur(); const P = S.pop; const { row } = findRow(song, P.row); delete P.slot;
   if (P.bar != null) {
     const nb = P.bar + d;
     if (nb >= 0 && nb < row.bars.length) { P.bar = nb; return; }
@@ -1263,6 +1291,7 @@ function stepChord(d) {
   const k = words.findIndex(x => x.row === P.row && x.i === P.i); const n = words[k + d];
   if (n) { P.row = n.row; P.i = n.i; S.sel = [n]; }
 }
+function rememberChords(v) { const pal = palette(cur().key).map(x => x.c); for (const c of [v].flat()) if (c !== '%' && c !== '.' && c !== '-' && !S.custom.includes(c) && !pal.includes(c)) S.custom.push(c); }
 function paint(who) {
   const song = cur(); pushHist();
   for (const { row, i } of S.sel) {
@@ -1293,7 +1322,7 @@ function clipLine(song, c) { // a copied line back into the song, with an id of 
   if (note) { song.notes[row.id] = note; if (noteBy) (song.noteBy ??= {})[row.id] = noteBy; if (replies) (song.replies ??= {})[row.id] = replies; }
   mark(row.id); return row;
 }
-const lineText = (c) => c.kind === 'bars' ? barsText(c.bars) : c.words.join(' ').trim();
+const lineText = (c) => c.kind === 'bars' ? barsText(c.bars, c.rep) : c.words.join(' ').trim();
 // the lines the selection covers, first to last; a line only partly selected gives just those words
 function selLines(song) {
   const by = new Map(); for (const { row, i } of S.sel) (by.get(row) ?? by.set(row, []).get(row)).push(i);
@@ -1864,7 +1893,8 @@ function handle(b, e, over) {
   if ('setc' in d) { setChord(d.setc); render(); return true; }
   if ('split' in d) { S.split = !S.split; render(); return true; }
   if ('delbar' in d) { const { row } = findRow(cur(), S.pop.row); pushHist(); row.bars.splice(S.pop.bar, 1); mark(row.id); if (!row.bars.length) { const l = findRow(cur(), row.id); l.sec.rows.splice(l.i, 1); } S.pop = null; render(); return true; }
-  if (d.bar) { const [row, i] = d.bar.split(':'); S.sel = []; S.pop = { type: 'chord', row, bar: +i }; render(); return true; }
+  if (d.bar) { const [row, i] = d.bar.split(':'); const sl = e?.target?.closest?.('[data-slot]'); S.sel = []; S.pop = { type: 'chord', row, bar: +i, ...(sl ? { slot: +sl.dataset.slot } : {}) }; render(); return true; }
+  if (d.rrep) { const { row } = findRow(cur(), S.pop.row); pushHist(); const n = Math.max(1, Math.min(16, (row.rep || 1) + +d.rrep)); if (n > 1) row.rep = n; else delete row.rep; mark(row.id); render(); return true; }
   if (d.addbar) { const { row } = findRow(cur(), d.addbar); pushHist(); row.bars.push([]); mark(row.id); S.sel = []; S.pop = { type: 'chord', row: row.id, bar: row.bars.length - 1 }; render(); return true; }
   // comments
   if ('recstart' in d) { const at = S.composer.at; startRec(at); return true; }
@@ -1916,8 +1946,8 @@ document.addEventListener('keydown', (e) => {
       const empty = !box.value.trim();
       if (e.key === 'Tab' || (empty && (e.key === 'ArrowRight' || e.key === 'ArrowLeft'))) {
         e.preventDefault(); const d = e.key === 'ArrowLeft' || e.shiftKey ? -1 : 1;
-        if (!empty) { const v = normChord(box.value); if (!v) { toast('No reconozco ese acorde'); return; } const bar = S.pop.bar;
-          if (v !== '%' && v !== '-' && !S.custom.includes(v) && !palette(cur().key).some(x => x.c === v)) S.custom.push(v);
+        if (!empty) { const v = typed(box.value, S.pop.bar != null); if (!v || (Array.isArray(v) && S.pop.slot != null)) { toast('No reconozco ese acorde'); return; } const bar = S.pop.bar;
+          rememberChords(v); delete S.pop.slot;
           const was = S.pop; const { row } = findRow(cur(), was.row); const n = row.bars?.length;
           setChord(v === '-' ? '' : v); S.pop = was; S.sel = bar == null ? [{ row: was.row, i: was.i }] : [];
           if (bar != null) { if (row.bars.length > n) row.bars.pop(); was.bar = bar; } } // Tab decides where to go, not the chord
@@ -2092,9 +2122,12 @@ document.addEventListener('submit', (e) => {
   if (f.dataset.mename !== undefined) { setName(document.getElementById('myname').value); render(); return; }
   if (f.id === 'nameform') { const v = document.getElementById('firstname').value.trim(); if (!v) return; setName(v); S.modal = null; render(); return; }
   if (f.dataset.rform !== undefined) { const v = document.getElementById('rnote').value.trim(); const s = cur(); if (v) { pushHist(); ((s.replies ??= {})[S.replyAt] ??= []).push({ who: ME, text: v }); mark(S.replyAt); } S.replyAt = null; render(); return; }
-  if (f.dataset.otro !== undefined) { const t = document.getElementById('otro').value; if (!t.trim()) return; const v = normChord(t); if (!v) { toast('No reconozco ese acorde'); return; }
+  if (f.dataset.otro !== undefined) { const t = document.getElementById('otro').value; if (!t.trim()) return;
+    const xr = S.pop.bar != null && t.trim().match(/^[x×](\d{1,2})$/i); // "x3": the whole line repeats
+    if (xr) { const { row } = findRow(cur(), S.pop.row); pushHist(); const n = Math.max(1, Math.min(16, +xr[1])); if (n > 1) row.rep = n; else delete row.rep; mark(row.id); render(); return; } const v = typed(t, S.pop.bar != null); if (!v) { toast('No reconozco ese acorde'); return; }
     if (v === '-' || (v === '%' && S.pop.bar == null)) { setChord(''); render(); return; }
-    if (v !== '%' && !S.custom.includes(v) && !palette(cur().key).some(x => x.c === v)) S.custom.push(v); setChord(v); render(); return; }
+    if (Array.isArray(v) && S.pop.slot != null) { toast('En un tiempo va un acorde'); return; }
+    rememberChords(v); setChord(v); render(); return; }
   if (f.dataset.cform !== undefined) { const v = document.getElementById('cnote').value.trim(); const s = cur(); const at = S.composer.at; if ((s.notes[at] ?? '') !== v) { pushHist(); if (v) { s.notes[at] = v; (s.noteBy ??= {})[at] = ME; } else delete s.notes[at]; mark(at); } S.composer = null; render(); return; }
   if (f.dataset.newtag !== undefined) { const v = document.getElementById('tagq').value; const vis = [...f.closest('.pop').querySelectorAll('.trow:not([hidden]) .tn')];
     if (vis.length === 1 && !vis[0].closest('.tagpop').querySelector('[data-mknew]:not([hidden])')) { paint(vis[0].dataset.paint); render(); } else makeTag(v); return; }
