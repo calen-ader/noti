@@ -568,7 +568,7 @@ function railV() {
   const pinned = S.peek && !narrow(), tt = pinned ? 'Fijar la barra' : 'Esconder la barra';
   const tog = `<button class="stog" data-${pinned ? 'pin' : 'collapse'} aria-label="${tt}" title="${tt}">${GL.side}</button>`;
   const nToday = allEvents().filter(x => x.e.date === TODAY).length;
-  const find = `<button class="sfield" data-search>${gl('search')}<span>Buscar</span><kbd>${/Mac|iP/.test(navigator.platform) ? '⌘K' : 'Ctrl K'}</kbd></button>`;
+  const find = `<button class="sfield" data-search>${gl('search')}<span>Buscar</span><kbd>${kbdFor('⌘K')}</kbd></button>`;
   const keys = S.navlook === 'bloques'
     ? `<div class="tiles"><button class="tile${S.screen === 'board' ? ' on' : ''}" data-go="board">${gl('home')}<span>Inicio</span></button><button class="tile${S.screen === 'cal' ? ' on' : ''}" data-go="cal">${calGlyph()}<span>Calendario${nToday ? `<small>${nToday} hoy</small>` : ''}</span></button></div>`
     : `<div class="ri key${S.screen === 'board' ? ' on' : ''}"><button class="rn" data-go="board">${gl('home')}<span>Inicio</span></button></div>
@@ -577,7 +577,7 @@ function railV() {
     <nav class="keys${S.navlook === 'bloques' ? ' nb' : ''}" aria-label="Principal">${find}${keys}</nav>
     ${shared.length ? `<div class="rl">Compartidos</div>${shared.map(row).join('')}` : ''}
     <div class="rl">Míos<button data-newproj aria-label="Nuevo proyecto">+</button></div>${mine.map(row).join('')}
-    <div class="ri add"><button class="rn" data-newproj><span>+ Nuevo proyecto</span></button></div>
+    <div class="ri add"><span class="tw" aria-hidden="true"></span><button class="rn" data-newproj><i class="sq nf" aria-hidden="true"></i><span>Nuevo proyecto</span></button></div>
     <span class="sp"></span>
     <div class="ri key bin${S.screen === 'bin' ? ' on' : ''}"><button class="rn" data-go="bin">${gl('bin')}<span>Papelera</span>${S.bin.length ? `<small class="cnt2">${S.bin.length}</small>` : ''}</button></div>
     <div class="ri me2${S.menu?.kind === 'me' ? ' menuon' : ''}"><button class="rn" data-mepop aria-haspopup="menu" aria-expanded="${S.menu?.kind === 'me'}"><i class="wsq me" style="--av:${cv(S.avatar)}">${esc((S.myName || '?')[0])}</i><span>${esc(S.myName)}</span><span class="chev" aria-hidden="true">···</span></button></div></aside>`;
@@ -852,7 +852,10 @@ const nameModal = () => `<div class="scrim"><form class="modal" id="nameform"><h
 const passModal = () => `<div class="scrim" data-close><form class="modal" id="passform"><h3>Contraseña</h3><p>Para entrar con tu mail sin esperar un link.</p>
   <input id="newpass" type="password" minlength="6" required autocomplete="new-password" placeholder="Al menos 6 caracteres" aria-label="Contraseña nueva"><input type="email" value="${esc(boot.me?.email ?? '')}" autocomplete="username" hidden>
   <div class="mbtns"><button class="b" type="button" data-close>Cancelar</button><button class="b solid" type="submit">Guardar</button></div></form></div>`;
-const keysModal = () => `<div class="scrim"><div class="modal"><h3>Atajos de teclado</h3><dl class="keys2">${[['⌘K', 'Buscar'], ['/', 'Insertar algo en una línea vacía'], ['Enter', 'Línea nueva; en una línea vacía, sección nueva'], ['⌫', 'Al principio de una parte: unirla con la de arriba'], ['⌘X ⌘C ⌘V', 'Cortar, copiar y pegar lo seleccionado, con acordes y etiquetas'], ['⌘Z ⇧⌘Z', 'Deshacer y rehacer'], ['Esc', 'Cerrar o soltar la selección'], ['A–G', 'Con un acorde abierto: escribirlo (am7, f#, bb/d) y Enter'], ['Tab ⇧Tab', 'Acordes: siguiente o anterior palabra o compás'], ['C . . G', 'En un compás: varios acordes; cada punto ocupa un tiempo'], ['x3', 'En un compás: la línea se repite 3 veces'], ['1–8', 'Acordes: los del tono, en orden'], ['Espacio', 'Ensayo: correr o pausar'], ['← →', 'Ensayo: canción anterior o siguiente']].map(([k, t]) => `<dt><kbd>${k}</kbd></dt><dd>${t}</dd>`).join('')}</dl><div class="mbtns"><button class="b solid" data-close>Listo</button></div></div></div>`;
+// shortcuts are written the Mac way; on Windows and Linux they read Ctrl and Shift
+const MAC = typeof navigator !== 'undefined' && /Mac|iP(hone|ad|od)/.test(navigator.platform || navigator.userAgent);
+const kbdFor = (k) => MAC ? k : k.replace(/⇧⌘(\w)/g, 'Ctrl+Shift+$1').replace(/⌘(\w)/g, 'Ctrl+$1').replace(/⇧Tab/g, 'Shift+Tab');
+const keysModal = () => `<div class="scrim"><div class="modal"><h3>Atajos de teclado</h3><dl class="keys2">${[['⌘K', 'Buscar'], ['/', 'Insertar algo en una línea vacía'], ['Enter', 'Línea nueva; en una línea vacía, sección nueva'], ['⌫', 'Al principio de una parte: unirla con la de arriba'], ['⌘X ⌘C ⌘V', 'Cortar, copiar y pegar lo seleccionado, con acordes y etiquetas'], ['⌘Z ⇧⌘Z', 'Deshacer y rehacer'], ['Esc', 'Cerrar o soltar la selección'], ['A–G', 'Con un acorde abierto: escribirlo (am7, f#, bb/d) y Enter'], ['Tab ⇧Tab', 'Acordes: siguiente o anterior palabra o compás'], ['C . . G', 'En un compás: varios acordes; cada punto ocupa un tiempo'], ['x3', 'En un compás: la línea se repite 3 veces'], ['1–8', 'Acordes: los del tono, en orden'], ['Espacio', 'Ensayo: correr o pausar'], ['← →', 'Ensayo: canción anterior o siguiente']].map(([k, t]) => `<dt><kbd>${kbdFor(k)}</kbd></dt><dd>${t}</dd>`).join('')}</dl><div class="mbtns"><button class="b solid" data-close>Listo</button></div></div></div>`;
 // B: a calendar subscription puts the events in the phone's own calendar and keeps them updated; the reminders then come from that calendar
 const subModal = () => `<div class="scrim"><div class="modal"><h3>Conectar con tu calendario</h3><p>Tus eventos aparecen en Google Calendar, Apple u Outlook y se actualizan solos.</p>
   <div class="lnk"><span>webcal://noti.app/cal/calen-7k2q.ics</span><button class="b" data-copy="noti.app/cal/calen-7k2q.ics">Copiar</button></div>
