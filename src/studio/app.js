@@ -32,6 +32,8 @@ const uid = (p = 'r') => p + Math.random().toString(36).slice(2, 10);
 const token = () => Array.from(crypto.getRandomValues(new Uint8Array(12)), b => 'abcdefghijkmnpqrstuvwxyz23456789'[b % 32]).join('');
 const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
 const cv = (k) => `var(--c-${k})`;
+// open/close arrow: a real chevron that turns, instead of a tiny ▸ character
+const CHEV = '<svg class="chv" viewBox="0 0 12 12" aria-hidden="true"><path d="M4.2 2.4 8 6l-3.8 3.6"/></svg>';
 const ICON = {
   play: '<svg class="ic" viewBox="0 0 16 16"><path d="M4 2.5v11l9.5-5.5z"/></svg>',
   pause: '<svg class="ic" viewBox="0 0 16 16"><path d="M3.5 2.5h3v11h-3zM9.5 2.5h3v11h-3z"/></svg>',
@@ -523,7 +525,7 @@ function secV(song, sec, colors, only) {
     : sec.name ? `<div class="sn" data-secname="${sec.id}">${esc(sec.name)}${reps}</div>`
     : showName ? `<div class="sn sugg" data-secname="${sec.id}"><span>${esc(sec.sugg || 'Sección')}</span>${sec.sugg ? `<button class="okg" data-oksugg="${sec.id}" title="Ponerle este nombre">Usar</button>` : ''}${reps}</div>` : '';
   const folded = S.fold.has(sec.id) && !ed;
-  const head = name ? `<div class="shd">${gutV('sec', sec.id, S.menu?.id === sec.id || ed)}<button class="fold" data-fold="${sec.id}" aria-label="${folded ? 'Desplegar' : 'Plegar'} ${esc(sec.name || 'parte')}">${folded ? '▸' : '▾'}</button>${name}</div>` : '';
+  const head = name ? `<div class="shd">${gutV('sec', sec.id, S.menu?.id === sec.id || ed)}<button class="fold${folded ? '' : ' open'}" data-fold="${sec.id}" aria-label="${folded ? 'Desplegar' : 'Plegar'} ${esc(sec.name || 'parte')}" aria-expanded="${!folded}">${CHEV}</button>${name}</div>` : '';
   const n = sec.rows.filter(r => r.kind === 'bars' || !isEmptyRow(r)).length;
   return `<section class="sec${folded ? ' isfolded' : ''}" data-sec="${sec.id}" style="--h:${cv(secCol(sec))}">${head}${folded ? `<button class="folded" data-fold="${sec.id}">${n} ${n === 1 ? 'renglón' : 'renglones'} plegados</button>` : `${commentsV(song, sec.id)}${composerV(sec.id)}
     ${sec.rows.map(r => r.kind === 'bars' ? barsV(song, sec, r) : lineV(song, r, colors, only)).join('')}`}</section>`;
@@ -560,7 +562,7 @@ function railV() {
     const open = S.open.has(p.id), here = S.pid === p.id && S.screen === 'project';
     const songs = open ? (p.songs.length ? p.songs.map((s, i) => `<div class="ri song${S.screen === 'song' && S.pid === p.id && S.si === i ? ' on' : ''}"><button class="rn" data-opensong="${p.id}:${i}"><span>${esc(titleOf(s))}</span>${p.shared && s.changed.size ? '<i class="dot"></i>' : ''}</button></div>`).join('')
       : '<div class="ri song empty">Sin canciones</div>') : '';
-    return `<div class="ri${here ? ' on' : ''}${S.menu?.pid === p.id ? ' menuon' : ''}" style="--pc:${p.pc}"><button class="tw" data-tog="${p.id}" aria-label="${open ? 'Cerrar' : 'Abrir'} ${esc(p.name)}">${open ? '▾' : '▸'}</button><button class="rn" data-proj="${p.id}"><i class="sq"></i><span>${esc(p.name || 'Sin nombre')}</span>${draftCount(p) ? '<i class="dot"></i>' : ''}</button><span class="ra"><button data-pmenu2="${p.id}" aria-label="Opciones">···</button><button data-newsong2="${p.id}" aria-label="Nueva canción">+</button></span></div>${songs}`;
+    return `<div class="ri${here ? ' on' : ''}${S.menu?.pid === p.id ? ' menuon' : ''}" style="--pc:${p.pc}"><button class="tw${open ? ' open' : ''}" data-tog="${p.id}" aria-label="${open ? 'Cerrar' : 'Abrir'} ${esc(p.name)}" aria-expanded="${open}">${CHEV}</button><button class="rn" data-proj="${p.id}"><i class="sq"></i><span>${esc(p.name || 'Sin nombre')}</span>${draftCount(p) ? '<i class="dot"></i>' : ''}</button><span class="ra"><button data-pmenu2="${p.id}" aria-label="Opciones">···</button><button data-newsong2="${p.id}" aria-label="Nueva canción">+</button></span></div>${songs}`;
   };
   const shared = PROJECTS.filter(p => p.shared || p.owner !== ME), mine = PROJECTS.filter(p => !shared.includes(p));
   const pinned = S.peek && !narrow(), tt = pinned ? 'Fijar la barra' : 'Esconder la barra';
@@ -757,7 +759,7 @@ function project() {
   if (tab === 'fechas') { const all = evs(p).map(e => ({ e, p })).sort(byWhen), up = all.filter(x => x.e.date >= TODAY), past = all.filter(x => x.e.date < TODAY).reverse();
     pane = `<div class="agroup">${up.length ? up.map(x => evRow(x, { noProj: true })).join('') : '<p class="empty1">Nada próximo.</p>'}</div>
       <div class="evbtns"><button class="b add" data-newev="${p.id}|">+ Evento</button><button class="b" data-go="cal">Ver en el calendario</button></div>
-      ${past.length ? `<details class="past"><summary>Pasados (${past.length})</summary>${past.map(x => evRow(x, { noProj: true })).join('')}</details>` : ''}`; }
+      ${past.length ? `<details class="past"><summary>${CHEV}Pasados (${past.length})</summary>${past.map(x => evRow(x, { noProj: true })).join('')}</details>` : ''}`; }
   return `<div class="top">${sideBtn()}<span class="crumbs"><span class="crumb cur">${esc(p.name || 'Sin nombre')}</span></span><span class="sp"></span><button class="b" data-sharepop>Compartir</button>${pubBtn(p)}<button class="b more" data-pmenu aria-label="Opciones del proyecto">···</button></div>
   <div class="scroll"><div class="proj">
     <header class="ph"><h1 class="h1" data-pname${ed ? ' contenteditable="plaintext-only" class="editing"' : ''} data-ph="Sin nombre">${esc(p.name)}</h1>${nextLine(p)}${descV('proj', p.desc, 'Notas del proyecto')}</header>
@@ -2298,13 +2300,13 @@ if (boot.mode === 'studio') {
   load(incoming);
   if (!boot.me?.name) S.modal = 'name';
   const want = PROJECTS.find(p => p.id === boot.open);
-  S.pid = (want ?? PROJECTS[0])?.id ?? null; if (S.pid) S.open.add(S.pid);
+  S.pid = (want ?? PROJECTS[0])?.id ?? null; // projects in the sidebar start closed
   if (want) S.screen = 'project';
 }
 if (boot.mode === 'demo') { // the examples the first time; after that, what was saved in this browser
   if (incoming?.projects?.length) load(incoming);
   else { const d = demoData(); PROJECTS.push(...d.projects); EVENTS.push(...d.events); }
-  S.pid = PROJECTS[0]?.id ?? null; if (S.pid) S.open.add(S.pid);
+  S.pid = PROJECTS[0]?.id ?? null;
 }
 if (boot.mode === 'student') {
   const x = incoming;
