@@ -174,15 +174,16 @@ svg.ic { width: 12px; height: 12px; display: inline-block; fill: currentColor; v
 .bar.rs::before { left: 3px } .bar.re::after { right: 3px }
 .bar.rs, .bar.re { position: relative }
 /* not repeated yet: a faint end-repeat sign to tap */
-.rsign { display: inline-flex; align-items: center; gap: 2px; height: 26px }
+.bars .xrep:has(.rsign) { justify-content: flex-start; padding: 0 }
+.rsign { display: flex; align-items: center; gap: 2px; align-self: stretch; padding-left: 16px } /* as tall as the bar line, like a real barline */
 .rsign i { display: flex; flex-direction: column; gap: 6px } .rsign i::before, .rsign i::after { content: ""; width: 4px; height: 4px; border-radius: 50%; background: currentColor }
-.rsign u { width: 1.5px; height: 26px; background: currentColor } .rsign u + u { width: 4px; margin-left: 1px }
+.rsign u { width: 1.5px; align-self: stretch; background: currentColor } .rsign u + u { width: 4px; margin-left: 1px }
 .bar.last { position: relative }
-.bars .xrep { position: absolute; right: 0; top: 0; width: 46px; height: 52px; display: flex; align-items: center; justify-content: center; border: 0; background: none; color: inherit; font: 700 1.05rem/1 var(--f-chord); white-space: nowrap; border-radius: 6px }
+.bars .xrep { position: absolute; right: 0; top: 0; bottom: 0; width: 46px; min-height: 52px; display: flex; align-items: center; justify-content: center; border: 0; background: none; color: inherit; font: 700 1.05rem/1 var(--f-chord); white-space: nowrap; border-radius: 6px }
 .bars button.xrep:hover, .bars .xrep.on { background: var(--s2) }
 .bars .xrep.off { color: var(--faint); font-weight: 400; opacity: 0; transition: opacity .15s }
 .br:hover .xrep.off, .bars .xrep.off.on, .bars .xrep.off:focus-visible { opacity: 1 }
-.st .bars .xrep { height: 44px }
+.st .bars .xrep { min-height: 44px }
 .rbars .xrep { align-self: center; padding-left: 14px }
 /* the + to add a bar: a small tab on the last bar's right edge, there when you point at the line */
 .bar .addb { position: absolute; right: -11px; top: 50%; translate: 0 -50%; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--p); border: 1px solid var(--line); color: var(--dim); font: 400 1rem/1 var(--f-text); opacity: 0; transition: opacity .15s; z-index: 1 }
