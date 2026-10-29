@@ -353,6 +353,10 @@ function guessKey(list) {
   return best;
 }
 function songChords(song) { const out = []; for (const r of rowsOf(song)) { if (r.kind === 'bars') r.bars.forEach(b => b.forEach(c => c !== '%' && c !== '.' && out.push(c))); else Object.keys(r.chords).map(Number).sort((a, b) => a - b).forEach(i => out.push(r.chords[i])); } return out; }
+// key, tempo and time start empty on a new song (song.open lists what nobody has set yet); until then the studio
+// plays and spells with C, 90 bpm and 4/4 without showing them
+const isSet = (s, k) => !s.open?.includes(k);
+const setNow = (s, k) => { if (s.open) { s.open = s.open.filter(x => x !== k); if (!s.open.length) delete s.open; } };
 function autoKey(song) { if (!song.keyAuto) return; const list = songChords(song); if (list.length >= 2) song.key = guessKey(list); }
 /* playback */
 function events(song) {
@@ -694,7 +698,7 @@ function orderRow(p, s, i) {
   return `<li class="orow" data-oi="${i}"><span class="grip" data-grip="${i}" aria-label="Arrastrar para ordenar">⠿</span><span class="k">${i + 1}</span>
     ${ed ? `<div class="ot"><b class="editing" data-stitle="${i}" contenteditable="plaintext-only">${esc(s.title)}</b></div>`
       : `<button class="ot" data-open="${i}"><b>${esc(titleOf(s))}${p.shared && s.changed.size ? '<i class="dot"></i>' : ''}</b>${cast.length ? `<span class="cast">${cast.map(x => `<i style="--h:${cv(x.c)}" title="${esc(nameOf(x.w))}"></i>`).join('')}</span>` : ''}</button>`}
-    <span class="m">${hasChords(s) ? keyName(s.key) : ''}</span><button class="b more" data-smenu="${i}" aria-label="Opciones">···</button></li>`;
+    <span class="m">${hasChords(s) && isSet(s, 'key') ? keyName(s.key) : ''}</span><button class="b more" data-smenu="${i}" aria-label="Opciones">···</button></li>`;
 }
 // generic blocks, like Notion's: what a block is for is up to whoever writes it
 const INSERT = [
@@ -776,8 +780,11 @@ function editor() {
   const empty = rowsOf(song).every(isEmptyRow) && !song.clips.length;
   const ted = S.editing?.kind === 'title';
   const cast = castOf(song);
-  const props = `<div class="props">${lanes ? `<span class="pk">Tono</span><button class="pv" data-pop="meta">${keyName(song.key)}</button>` : ''}
-      <span class="pk">Tempo</span><button class="pv" data-pop="meta">${song.bpm} bpm · ${song.ts}</button>
+  const guess = !isSet(song, 'key') && songChords(song).length >= 2; // a few chords in: offer the key they point to
+  const add = (t) => `<span class="chip addc">${t}</span>`;
+  const props = `<div class="props">${lanes || !isSet(song, 'key') ? `<span class="pk">Tono</span>${isSet(song, 'key') ? `<button class="pv" data-pop="meta">${keyName(song.key)}</button>`
+        : guess ? `<span class="pv"><button class="chip keyq" data-keyok title="Usar este tono">${EN ? '' : '¿'}${keyName(song.key)}?</button><button class="chip addc" data-pop="meta">Otro</button></span>` : `<button class="pv" data-pop="meta">${add('Agregar tono')}</button>`}` : ''}
+      <span class="pk">Tempo</span><button class="pv" data-pop="meta">${isSet(song, 'bpm') ? `${song.bpm} bpm` : add('Agregar tempo')}${isSet(song, 'ts') ? `<span class="tsv">${isSet(song, 'bpm') ? ' · ' : ''}${song.ts}</span>` : add('Agregar métrica')}</button>
       <span class="pk">Etiquetas</span><span class="pv">${cast.length ? cast.map(x => `<span class="chip" style="--h:${cv(x.c)}">${esc(nameOf(x.w))}</span>`).join('') : '<span class="quiet0">Ninguna</span>'}</span>
       ${(() => { const on = upcoming().filter(x => x.e.songs.includes(song.id)).slice(0, 3); return on.length ? `<span class="pk">Eventos</span><span class="pv">${on.map(x => `<button class="chip evc" data-ev="${x.e.id}">${dayShort(x.e.date)} · ${esc(evTitle(x.e))}</button>`).join('')}</span>` : ''; })()}
       ${p.shared ? `<span class="pk">Estado</span><span class="pv">${song.changed.size ? '<span class="chip draft">Sin publicar</span>' : '<span class="chip ok">Publicada</span>'}</span>` : ''}</div>`;
@@ -834,9 +841,9 @@ function popV() {
   }
   if (P.type === 'rep') { const r = findRow(song, P.row)?.row; return r ? `<div class="pop reppop"><div class="mlab">Repetir la línea</div>${repStep(r)}</div>` : ''; }
   if (P.type === 'meta') return `<div class="pop">
-      <div class="mrow"><span>Tono</span><button class="b" data-tr="-1" aria-label="Bajar">−</button><b>${keyName(song.key)}</b><button class="b" data-tr="1" aria-label="Subir">+</button></div>
-      <div class="mrow"><span>Tempo</span><button class="b" data-bpm="-4" aria-label="Más lento">−</button><b>${song.bpm}</b><button class="b" data-bpm="4" aria-label="Más rápido">+</button></div>
-      <div class="mrow"><span>Compás</span>${['4/4', '3/4', '6/8', '2/4'].map(t => `<button class="b${song.ts === t ? ' on' : ''}" data-setts="${t}">${t}</button>`).join('')}</div></div>`;
+      <div class="mrow"><span>Tono</span><button class="b" data-tr="-1" aria-label="Bajar">−</button><b>${isSet(song, 'key') ? keyName(song.key) : `<button class="b" data-keyset>${keyName(song.key)}</button>`}</b><button class="b" data-tr="1" aria-label="Subir">+</button></div>
+      <div class="mrow"><span>Tempo</span><button class="b" data-bpm="-4" aria-label="Más lento">−</button><b>${isSet(song, 'bpm') ? song.bpm : `<button class="b" data-bpm="0">${song.bpm}</button>`}</b><button class="b" data-bpm="4" aria-label="Más rápido">+</button></div>
+      <div class="mrow"><span>Compás</span>${['4/4', '3/4', '6/8', '2/4'].map(t => `<button class="b${isSet(song, 'ts') && song.ts === t ? ' on' : ''}" data-setts="${t}">${t}</button>`).join('')}</div></div>`;
   return '';
 }
 function pubModal(p) {
@@ -879,7 +886,7 @@ const foldersV = (list) => `<div class="folders">${list.map(folderV).join('')}<b
 function songTiles(p) {
   return `<div class="sgrid" id="sgrid">${p.songs.map((s, i) => { const n = castOf(s).length;
     return `<div class="stile" data-gi="${i}"><button class="sopen" data-open="${i}" aria-label="Abrir ${esc(titleOf(s))}">${miniSheetOf(s)}</button><span class="gk" data-ggrip="${i}" title="Arrastrar para ordenar">${i + 1}</span>
-      <span class="sfoot"><span class="st2"><b>${esc(titleOf(s))}${p.shared && s.changed.size ? '<i class="dot"></i>' : ''}</b><small>${[hasChords(s) ? keyName(s.key) : '', n ? `${n} ${n === 1 ? 'etiqueta' : 'etiquetas'}` : ''].filter(Boolean).join(' · ') || '&nbsp;'}</small></span><button class="b more" data-smenu="${i}" aria-label="Opciones" aria-expanded="${S.menu?.i === i && /song|move/.test(S.menu.kind)}">···</button></span></div>`; }).join('')}
+      <span class="sfoot"><span class="st2"><b>${esc(titleOf(s))}${p.shared && s.changed.size ? '<i class="dot"></i>' : ''}</b><small>${[hasChords(s) && isSet(s, 'key') ? keyName(s.key) : '', n ? `${n} ${n === 1 ? 'etiqueta' : 'etiquetas'}` : ''].filter(Boolean).join(' · ') || '&nbsp;'}</small></span><button class="b more" data-smenu="${i}" aria-label="Opciones" aria-expanded="${S.menu?.i === i && /song|move/.test(S.menu.kind)}">···</button></span></div>`; }).join('')}
     <button class="stile add" data-newsong><span class="mini"><span class="plus">+</span></span><span class="sfoot"><span class="st2"><b>Canción</b></span></span></button></div>`;
 }
 // one date as a row: the day as a block, then what, when and where
@@ -1027,7 +1034,7 @@ function rehV() {
     ${sec.rows.map(r => r.kind === 'bars' ? `<div class="rbars">${r.bars.map(b => `<span>${esc(barStr(b) || '·')}</span>`).join('')}${r.rep > 1 ? `<b class="xrep">×${r.rep}</b>` : ''}</div>` : isEmptyRow(r) ? ''
       : `<p class="rl2">${r.words.map((w, i) => { const who = s.main[r.id]?.[i], o = s.ov[r.id]?.[i], st = (who ? `--h:${cv(colors[who])};` : '') + (o ? `--h2:${cv(colors[o.who])}` : '');
         return `<span class="rw${who ? ' on' : ''}${o ? ' ov' : ''}"${st ? ` style="${st}"` : ''}><i>${r.chords[i] ? esc(r.chords[i]) : ''}</i><span class="ww">${esc(w)}${i < r.words.length - 1 ? ' ' : ''}</span></span>`; }).join('<wbr>')}</p>${s.notes[r.id] ? `<p class="rnote">${esc(s.notes[r.id])}</p>` : ''}`).join('')}</section>`).join('');
-  return `<div class="reh${lanes ? ' lanes' : ''}" role="dialog" aria-label="Ensayo"><div class="rtop"><button class="rb" data-rehx aria-label="Salir del ensayo">×</button><span class="rt"><b>${esc(titleOf(s))}</b><small>${R.list.length > 1 ? `${R.k + 1} de ${R.list.length} · ` : ''}${lanes ? keyName(s.key) + ' · ' : ''}${s.bpm} bpm</small></span><span class="sp"></span>
+  return `<div class="reh${lanes ? ' lanes' : ''}" role="dialog" aria-label="Ensayo"><div class="rtop"><button class="rb" data-rehx aria-label="Salir del ensayo">×</button><span class="rt"><b>${esc(titleOf(s))}</b><small>${R.list.length > 1 ? `${R.k + 1} de ${R.list.length} · ` : ''}${[lanes && isSet(s, 'key') ? keyName(s.key) : '', isSet(s, 'bpm') ? s.bpm + ' bpm' : ''].filter(Boolean).join(' · ')}</small></span><span class="sp"></span>
     <span class="rsp"><button class="rb" data-rehsp="-1" aria-label="Más lento">−</button><span>${R.speed}×</span><button class="rb" data-rehsp="1" aria-label="Más rápido">+</button></span><button class="rb play" data-rehplay>${R.play ? 'Pausa' : 'Correr'}</button></div>
     <div class="rbody" id="rehs"><div class="rpage">${body}<div class="rend">${nx ? `<button class="rb big" data-rehgo="1">Sigue: ${esc(titleOf(nx))} ›</button>` : 'Fin'}</div></div></div>
     <div class="rbot"><button class="rb" data-rehgo="-1" ${R.k ? '' : 'disabled'}>‹ Anterior</button><span class="rhint">Tocá abajo para avanzar, arriba para volver</span><button class="rb" data-rehgo="1" ${nx ? '' : 'disabled'}>Siguiente ›</button></div></div>`;
@@ -1860,7 +1867,7 @@ function handle(b, e, over) {
   if (d.ptab) { S.ptab = d.ptab; render(); return true; }
   if (d.open) { openSong(+d.open); return true; }
   if ('newsong' in d) {
-    const s = Song('', 'C', 90, '4/4', [Sec('', [L('')])]); s.keyAuto = true; s.secs[0].auto = true;
+    const s = Song('', 'C', 90, '4/4', [Sec('', [L('')])]); s.keyAuto = true; s.secs[0].auto = true; s.open = ['key', 'bpm', 'ts'];
     proj().songs.push(s); S.si = proj().songs.length - 1; S.screen = 'song'; S.hist = []; clearSel(); S.editing = { kind: 'title' }; render(); return true;
   }
   if ('share' in d) { const p = proj(); p.shared = true; p.link ??= token(); p.songs.forEach(s => s.changed = new Set()); p.version = Math.max(1, p.version); snapshot(p); render(); return true; }
@@ -1883,11 +1890,13 @@ function handle(b, e, over) {
   if (d.rate) { const c = allClips().find(x => x.id === d.rate); c.rate = c.rate < 1 ? 1 : 0.75; playClip(c); return true; }
   if (d.loop) { const c = allClips().find(x => x.id === d.loop); c.loop = !c.loop; render(); return true; }
   if (d.pop === 'meta') { S.sel = []; S.pop = S.pop?.type === 'meta' ? null : { type: 'meta' }; render(); return true; }
-  if (d.tr) { const s = cur(); const n = +d.tr; pushHist(); s.keyAuto = false; const nk = transKey(s.key, n);
+  if ('keyok' in d) { const s = cur(); pushHist(); s.keyAuto = false; setNow(s, 'key'); render(); return true; }
+  if (d.tr) { const s = cur(); const n = +d.tr; pushHist(); s.keyAuto = false; setNow(s, 'key'); const nk = transKey(s.key, n);
     for (const r of rowsOf(s)) { if (r.kind === 'bars') r.bars = r.bars.map(x => x.map(c => c === '%' ? c : transChord(c, n, nk))); else for (const k in r.chords) r.chords[k] = transChord(r.chords[k], n, nk); if (r.kind === 'bars' || Object.keys(r.chords).length) mark(r.id); }
     s.key = nk; S.custom = S.custom.map(c => transChord(c, n, nk)); render(); return true; }
-  if (d.bpm) { const s = cur(); s.bpm = Math.max(40, Math.min(220, s.bpm + +d.bpm)); render(); return true; }
-  if (d.setts) { cur().ts = d.setts; render(); return true; }
+  if (d.bpm) { const s = cur(); s.bpm = Math.max(40, Math.min(220, s.bpm + +d.bpm)); setNow(s, 'bpm'); render(); return true; }
+  if (d.setts) { cur().ts = d.setts; setNow(cur(), 'ts'); render(); return true; }
+  if ('keyset' in d) { const s = cur(); pushHist(); s.keyAuto = false; setNow(s, 'key'); render(); return true; }
   if (d.tool) {
     const t = d.tool, song = cur();
     if (S.sel.length && t !== 'bars') { const map = { write: 'edit', chord: 'chord', singer: 'singer', note: 'note', rec: 'rec' }; S.tool = null; return handle(b, e, { act: map[t] }); }
