@@ -147,7 +147,9 @@ svg.ic { width: 12px; height: 12px; display: inline-block; fill: currentColor; v
 .bar > span + span { margin-left: 0 }
 .bar .chs { display: grid; grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr)); white-space: nowrap }
 .bar .chs > span { padding-right: 4px }
-@media (max-width: 600px) { .bar .chs { font-size: calc(1em * min(1, 2 / var(--k, 1))) } }
+.bar:not(.plus) { container-type: inline-size }
+/* a busy bar: the chords get smaller to fit, never below a readable size */
+.bar .chs { font-size: clamp(0.78rem, calc(100cqi / (var(--k, 1) * 2.3)), 1em) }
 .bar:nth-child(4n) { border-right: 1.5px solid var(--ink) }
 .bar.sim .chs, .bar.empty .chs { color: var(--faint); font-weight: 400 }
 .bar .bt { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); margin: 0 -8px -4px 0 }
@@ -160,13 +162,23 @@ svg.ic { width: 12px; height: 12px; display: inline-block; fill: currentColor; v
 .bar:hover, .bar.tgt { background: var(--s2) }
 .bar.now { background: color-mix(in srgb, var(--acc) 22%, transparent) }
 .bar.now .bt i:not(.and) b { background: var(--ink) }
-.br.rp .bars { position: relative; padding-right: 46px; max-width: 686px }
+.bars { position: relative; padding-right: 46px; max-width: 686px }
 .bar.rs { border-left: 4.5px double var(--ink) }
 .bar.re { border-right: 4.5px double var(--ink) !important }
-.bars .xrep { position: absolute; right: 0; top: 0; width: 46px; height: 52px; display: flex; align-items: center; justify-content: center; font: 700 1.05rem/1 var(--f-chord); white-space: nowrap }
+.bar.last { position: relative }
+.bars .xrep { position: absolute; right: 0; top: 0; width: 46px; height: 52px; display: flex; align-items: center; justify-content: center; border: 0; background: none; color: inherit; font: 700 1.05rem/1 var(--f-chord); white-space: nowrap; border-radius: 6px }
+.bars button.xrep:hover, .bars .xrep.on { background: var(--s2) }
+.bars .xrep.off { color: var(--faint); font-weight: 400; opacity: 0; transition: opacity .15s }
+.br:hover .xrep.off, .bars .xrep.off.on, .bars .xrep.off:focus-visible { opacity: 1 }
 .st .bars .xrep { height: 44px }
 .rbars .xrep { align-self: center; padding-left: 14px }
-.pop .rrow { align-items: center; gap: 8px } .pop .rrow span { font-size: 0.85rem; color: var(--dim); margin-right: auto }
+/* the + to add a bar: a small tab on the last bar's right edge, there when you point at the line */
+.bar .addb { position: absolute; right: -11px; top: 50%; translate: 0 -50%; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--p); border: 1px solid var(--line); color: var(--dim); font: 400 1rem/1 var(--f-text); opacity: 0; transition: opacity .15s; z-index: 1 }
+.br:hover .addb, .br:has(.tgt) .addb { opacity: 1 }
+.bar .addb:hover { color: var(--ink); border-color: var(--ink) }
+@media (hover: none) { .bars .xrep.off { opacity: 0.45 } .bar .addb { opacity: 0.6 } }
+.rrow { display: flex; align-items: center; gap: 8px } .rrow b { min-width: 2.2em; text-align: center; font-family: var(--f-chord) }
+.reppop .mlab { margin-bottom: 6px }
 .bar.plus { border-left: 1.5px dashed var(--line); color: var(--faint); align-items: flex-start; justify-content: center; font-weight: 400 }
 .bar.plus:nth-child(4n) { border-right: 0 }
 
@@ -1113,3 +1125,4 @@ body { overscroll-behavior: none; -webkit-font-smoothing: antialiased }
 .sharep .edr .eda button:hover { color: var(--ink) }
 /* not invited yet: no way to start a project */
 .nocreate [data-newproj] { display: none !important }
+.st .br:not(.rp) .bars { padding-right: 0 }
