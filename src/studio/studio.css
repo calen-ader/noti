@@ -167,8 +167,16 @@ svg.ic { width: 12px; height: 12px; display: inline-block; fill: currentColor; v
 .bar.now { background: color-mix(in srgb, var(--acc) 22%, transparent) }
 .bar.now .bt i:not(.and) b { background: var(--ink) }
 .bars { position: relative; padding-right: 46px; max-width: 686px }
-.bar.rs { border-left: 4.5px double var(--ink) }
-.bar.re { border-right: 4.5px double var(--ink) !important }
+/* a repeated line: ‖: at the start, :‖ at the end, the way it's written on a chart */
+.bar.rs { border-left: 4.5px double var(--ink); padding-left: 14px }
+.bar.re { border-right: 4.5px double var(--ink) !important; padding-right: 14px }
+.bar.rs::before, .bar.re::after { content: ""; position: absolute; top: 19px; width: 4px; height: 4px; border-radius: 50%; background: var(--ink); box-shadow: 0 10px 0 var(--ink); pointer-events: none }
+.bar.rs::before { left: 3px } .bar.re::after { right: 3px }
+.bar.rs, .bar.re { position: relative }
+/* not repeated yet: a faint end-repeat sign to tap */
+.rsign { display: inline-flex; align-items: center; gap: 2px; height: 26px }
+.rsign i { display: flex; flex-direction: column; gap: 6px } .rsign i::before, .rsign i::after { content: ""; width: 4px; height: 4px; border-radius: 50%; background: currentColor }
+.rsign u { width: 1.5px; height: 26px; background: currentColor } .rsign u + u { width: 4px; margin-left: 1px }
 .bar.last { position: relative }
 .bars .xrep { position: absolute; right: 0; top: 0; width: 46px; height: 52px; display: flex; align-items: center; justify-content: center; border: 0; background: none; color: inherit; font: 700 1.05rem/1 var(--f-chord); white-space: nowrap; border-radius: 6px }
 .bars button.xrep:hover, .bars .xrep.on { background: var(--s2) }
