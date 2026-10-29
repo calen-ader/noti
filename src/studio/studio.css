@@ -145,14 +145,28 @@ svg.ic { width: 12px; height: 12px; display: inline-block; fill: currentColor; v
 .bars { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); max-width: 640px }
 .bar { border: 0; border-left: 1.5px solid var(--ink); background: none; text-align: left; min-height: 52px; padding: 6px 8px 4px; display: flex; flex-direction: column; justify-content: space-between; color: inherit; font: 650 1.3rem/1.1 var(--f-chord) }
 .bar > span + span { margin-left: 0 }
-.bar .chs { display: flex; gap: 12px }
+.bar .chs { display: grid; grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr)); white-space: nowrap }
+.bar .chs > span { padding-right: 4px }
+@media (max-width: 600px) { .bar .chs { font-size: calc(1em * min(1, 2 / var(--k, 1))) } }
 .bar:nth-child(4n) { border-right: 1.5px solid var(--ink) }
 .bar.sim .chs, .bar.empty .chs { color: var(--faint); font-weight: 400 }
-.bar .bt { display: flex; gap: 4px; font-style: normal }
-.bar .bt b { width: 4px; height: 4px; border-radius: 50%; background: var(--line) }
+.bar .bt { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); margin: 0 -8px -4px 0 }
+.bar .bt i { display: flex; align-items: center; height: 14px; font-style: normal }
+.bar .bt b { width: 5px; height: 5px; border-radius: 50%; background: var(--line) }
+.bar .bt i.and b { width: 3px; height: 3px; opacity: 0.6 }
+.bar [data-slot] { cursor: pointer }
+.bar [data-slot]:hover b, .bar [data-slot][data-on] b { background: var(--ink); opacity: 1; transform: scale(1.6) }
+.pop .slotat { margin: 0 0 8px; font-size: 0.8rem; color: var(--dim) }
 .bar:hover, .bar.tgt { background: var(--s2) }
 .bar.now { background: color-mix(in srgb, var(--acc) 22%, transparent) }
-.bar.now .bt b { background: var(--ink) }
+.bar.now .bt i:not(.and) b { background: var(--ink) }
+.br.rp .bars { position: relative; padding-right: 46px; max-width: 686px }
+.bar.rs { border-left: 4.5px double var(--ink) }
+.bar.re { border-right: 4.5px double var(--ink) !important }
+.bars .xrep { position: absolute; right: 0; top: 0; width: 46px; height: 52px; display: flex; align-items: center; justify-content: center; font: 700 1.05rem/1 var(--f-chord); white-space: nowrap }
+.st .bars .xrep { height: 44px }
+.rbars .xrep { align-self: center; padding-left: 14px }
+.pop .rrow { align-items: center; gap: 8px } .pop .rrow span { font-size: 0.85rem; color: var(--dim); margin-right: auto }
 .bar.plus { border-left: 1.5px dashed var(--line); color: var(--faint); align-items: flex-start; justify-content: center; font-weight: 400 }
 .bar.plus:nth-child(4n) { border-right: 0 }
 
