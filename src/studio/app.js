@@ -738,6 +738,10 @@ async function openFile(f) {
 function menuV() {
   const M = S.menu;
   if (M.kind === 'me') return meV();
+  if (M.kind === 'evlink') { const F = findEv(S.ev); if (!F) return ''; const { e, p } = F; const from = p.id ? [p] : PROJECTS.filter(x => x.songs.length);
+    const tick = (on) => `<i class="tick${on ? ' on' : ''}" aria-hidden="true"></i>`; const fs = (p.files ?? []).filter(f => !f.busy);
+    return `<div class="pop menu flm">${from.map(x => `<div class="mlab">${p.id ? 'Canciones' : esc(x.name || 'Sin nombre')}</div>${x.songs.map(sg => `<button data-evls="${esc(sg.id)}" aria-pressed="${e.songs.includes(sg.id)}">${tick(e.songs.includes(sg.id))}${esc(titleOf(sg))}</button>`).join('')}`).join('')}
+      ${fs.length ? `<div class="mlab">Archivos</div>${fs.map(f => `<button data-evlf="${esc(f.id)}" aria-pressed="${!!f.evs?.includes(e.id)}">${tick(f.evs?.includes(e.id))}${esc(f.name)}</button>`).join('')}` : ''}</div>`; }
   if (M.kind === 'flink') { const p = proj(); const f = p.files?.find(x => x.id === M.id); if (!f) return '';
     const evsP = evs(p).filter(e => e.date >= TODAY || f.evs?.includes(e.id)).map(e => ({ e })).sort(byWhen).map(x => x.e);
     const tick = (on) => `<i class="tick${on ? ' on' : ''}" aria-hidden="true"></i>`;
@@ -949,7 +953,11 @@ function evPanel() {
   const F = findEv(S.ev); if (!F) { S.ev = null; return ''; } const { e, p } = F;
   const tags = p.id ? [...crew(p).groups.map(g => g.id), ...(p.tags ?? [])] : [];
   const from = p.id ? [p] : PROJECTS.filter(x => x.songs.length);
-  const songList = from.map(x => `${p.id ? '' : `<div class="evsg">${esc(x.name || 'Sin nombre')}</div>`}${x.songs.map(s => `<label class="evs"><input type="checkbox" data-evsong="${s.id}"${e.songs.includes(s.id) ? ' checked' : ''}><span>${esc(titleOf(s))}</span></label>`).join('')}`).join('');
+  // nothing is linked to a date until someone links it: songs to rehearse, files to bring
+  const lsongs = e.songs.map(songAny).filter(Boolean), lfiles = (p.files ?? []).filter(f => !f.busy && f.evs?.includes(e.id));
+  const linkedV = lsongs.map(x => `<span class="chip lk2">${esc(titleOf(x.s))}<button data-evls="${esc(x.s.id)}" aria-label="Quitar ${esc(titleOf(x.s))}">×</button></span>`)
+    .concat(lfiles.map(f => `<span class="chip lk2 fch"><i class="fk k-${fileKind(f).toLowerCase()}">${fileKind(f)}</i><button class="fnm" data-fopen="${esc(f.id)}">${esc(f.name)}</button><button data-evlf="${esc(f.id)}" aria-label="Quitar ${esc(f.name)}">×</button></span>`)).join('');
+  const canLink = from.some(x => x.songs.length) || (p.files ?? []).length;
   const linked = !!p.id && p.shared;
   return `<aside class="evp" aria-label="Evento"><div class="eh"><span class="evproj" style="--pc:${p.pc}"><i class="sq"></i><select id="evproj" aria-label="Proyecto"><option value=""${p.id ? '' : ' selected'}>Sin proyecto</option>${PROJECTS.map(x => `<option value="${x.id}"${x === p ? ' selected' : ''}>${esc(x.name || 'Sin nombre')}</option>`).join('')}</select></span><span class="sp"></span><button class="b star${e.star ? ' on' : ''}" data-evstar aria-pressed="${e.star}" title="Un evento destacado cuenta los días que faltan">${e.star ? 'Destacado' : 'Destacar'}</button><button class="b" data-evclose aria-label="Cerrar">×</button></div>
     <div class="eb"><input class="evt" id="evtitle" value="${esc(e.title)}" placeholder="Sin título" autocomplete="off" aria-label="Título">
@@ -957,7 +965,7 @@ function evPanel() {
         <span>Repetir</span><span><select id="evrep" class="evsel">${REPEAT.map(([k, t]) => `<option value="${k}"${(e.repeat || '') === k ? ' selected' : ''}>${t}</option>`).join('')}</select></span>
         <span>Dónde</span><input id="evplace" value="${esc(e.place)}" placeholder="Agregar lugar" autocomplete="off">
         ${tags.length ? `<span>Para</span><span class="evtags">${tags.map(id => `<button class="chip${e.who.includes(id) ? ' on' : ''}" data-evwho="${esc(id)}" style="--h:${cv(tagColor(p, id))}">${esc(nameOf(id))}</button>`).join('')}</span>` : ''}</div>
-      <div class="evsec"><div class="mlab">Canciones</div>${songList || '<p class="empty1">Todavía no hay canciones.</p>'}</div>
+      <div class="evsec evlinks">${linkedV}${canLink ? `<button class="b add" data-evlink aria-expanded="${S.menu?.kind === 'evlink'}">+ Vincular</button>` : ''}</div>
       <div class="evsec"><div class="mlab">Nota</div><textarea id="evnote" placeholder="Algo para recordar">${esc(e.note)}</textarea>${linked ? `<label class="tgl evvis"><span>${e.noteAll ? 'La ven quienes tienen el link' : 'Solo la ven quienes editan'}<small>${e.noteAll ? 'Aparece con el evento en su vista' : 'Queda como nota tuya y de quienes editan'}</small></span><input type="checkbox" id="evnoteall"${e.noteAll ? ' checked' : ''}><i></i></label>` : ''}</div>
       <div class="evact">${e.songs.some(id => songAny(id)) ? '<button class="b solid" data-reh="ev">Ensayar estas canciones</button>' : ''}<button class="b" data-ics="${e.id}">Agregar a mi calendario</button><button class="b danger" data-evdel>Borrar evento</button></div>
     </div></aside>`;
@@ -1552,13 +1560,13 @@ function after() {
   if (S.conflict) app.insertAdjacentHTML('beforeend', `<div class="toast warn" role="alert">Alguien más cambió esto mientras editabas, y lo tuyo de ese momento no se guardó. <button data-reload>Recargar</button></div>`);
   else if (S.offline) app.insertAdjacentHTML('beforeend', `<div class="toast warn" role="status">Sin conexión. Lo que cambies se guarda cuando vuelva.</div>`);
   if (S.toast) app.insertAdjacentHTML('beforeend', `<div class="toast" role="status">${esc(S.toast)}${S.trash ? ' <button data-restore>Deshacer</button>' : ''}</div>`);
+  if (S.ev) app.insertAdjacentHTML('beforeend', evPanel());
   if (S.menu) {
     const M = S.menu;
     const q = M.q ?? (M.kind === 'me' ? '[data-mepop]' : M.kind === 'share' ? '[data-sharepop]' : (M.kind === 'song' || M.kind === 'move') ? (M.here ? '[data-songmenu]' : `[data-smenu="${M.i}"]`) : M.kind === 'proj' ? (M.fold ? `[data-fmenu="${M.pid}"]` : M.pid ? `[data-pmenu2="${M.pid}"]` : '[data-pmenu]') : M.kind === 'insert' ? `[data-plus="${M.at}"]` : `[data-handle="${M.kind}:${M.id}"]`);
     const a = document.querySelector(q);
     if (a) place(menuV(), rectOf([a]), M.at === 'end:' || M.kind === 'me' ? 'above' : 'below'); else S.menu = null;
   }
-  if (S.ev) app.insertAdjacentHTML('beforeend', evPanel());
   if (S.search) { app.insertAdjacentHTML('beforeend', searchV()); const i = document.getElementById('sq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
   if (S.reh) { app.insertAdjacentHTML('beforeend', rehV()); const r = document.getElementById('rehs'); if (r) { r.scrollTop = S.reh.y; r.addEventListener('scroll', () => { if (Math.abs(r.scrollTop - S.reh.y) > 3) S.reh.y = r.scrollTop; }, { passive: true }); } }
   if (S.replyAt) document.getElementById('rnote')?.focus({ preventScroll: true });
@@ -1867,7 +1875,10 @@ function handle(b, e, over) {
     snapshot(p); PROJECTS.push(p); S.pid = p.id; S.screen = 'project'; S.ptab = 'canciones'; S.editing = { kind: 'pname' }; render(); return true;
   }
   if (d.ptab) { S.ptab = d.ptab; S.fdel = null; render(); return true; }
-  if (d.fopen) { const f = proj()?.files?.find(x => x.id === d.fopen); if (f) openFile(f); return true; }
+  if (d.fopen) { const f = (proj()?.files?.find(x => x.id === d.fopen)) ?? PROJECTS.flatMap(x => x.files ?? []).find(x => x.id === d.fopen); if (f) openFile(f); return true; }
+  if ('evlink' in d) { S.menu = S.menu?.kind === 'evlink' ? null : { kind: 'evlink', q: '[data-evlink]' }; render(); return true; }
+  if (d.evls) { const F = findEv(S.ev); if (!F) return true; F.e.songs = F.e.songs.includes(d.evls) ? F.e.songs.filter(x => x !== d.evls) : [...F.e.songs, d.evls]; render(); return true; }
+  if (d.evlf) { const F = findEv(S.ev); const f = F?.p.files?.find(x => x.id === d.evlf); if (!f) return true; f.evs = f.evs?.includes(F.e.id) ? f.evs.filter(x => x !== F.e.id) : [...(f.evs ?? []), F.e.id]; render(); return true; }
   if (d.flink) { S.menu = S.menu?.kind === 'flink' && S.menu.id === d.flink ? null : { kind: 'flink', id: d.flink, q: `[data-flink="${d.flink}"]` }; render(); return true; }
   if (d.flsong || d.flev) { const [fid, x] = (d.flsong || d.flev).split('|'); const f = proj()?.files?.find(y => y.id === fid); if (!f) return true;
     const k = d.flsong ? 'songs' : 'evs'; f[k] = f[k]?.includes(x) ? f[k].filter(y => y !== x) : [...(f[k] ?? []), x]; render(); return true; }
@@ -2212,7 +2223,6 @@ document.addEventListener('change', (e) => {
   if (F && el.id === 'evremind') { F.e.remind = el.value; render(); return; }
   if (F && el.id === 'evtell') { F.e.tell = el.checked; return; }
   if (F && el.id === 'evnoteall') { F.e.noteAll = el.checked; render(); return; }
-  if (F && el.dataset.evsong) { const sid = el.dataset.evsong; F.e.songs = el.checked ? [...F.e.songs, sid] : F.e.songs.filter(x => x !== sid); render(); return; }
   if (el.id === 'upl' && el.files[0] && !el.files[0].type.startsWith('audio/')) { // a photo of a chart, a PDF: kept as a file on the line
     const file = el.files[0]; const song = cur(); const at = S.composer.at; pushHist();
     song.clips.push({ id: uid('c'), at, who: ME, file: true, img: file.type.startsWith('image/'), ext: (file.name.split('.').pop() || 'archivo').slice(0, 4).toUpperCase(), vis: proj().shared && S.cvis === 'alumnos' ? 'alumnos' : 'solo', label: file.name, url: URL.createObjectURL(file) });
