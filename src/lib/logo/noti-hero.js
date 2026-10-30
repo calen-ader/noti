@@ -189,3 +189,8 @@ export function mountNotiHero(container, { intro = true, interactive = true, lab
     }
   };
 }
+
+// the wordmark at rest, as an SVG string, for places that don't move (the PDF export)
+export function notiLogoSvg(attrs = '') {
+  return `<svg viewBox="113 110 975 354" fill="currentColor" role="img" aria-label="Noti" ${attrs}>${Object.values(PARTS).map(d => `<path d="${d}"/>`).join('')}<path fill-rule="evenodd" d="${O_OUTER} ${O_COUNTER}"/><path d="${BROW}"/></svg>`;
+}
