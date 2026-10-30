@@ -3,15 +3,15 @@
    in the "Consola" colours: white sheet on grey, charcoal ink, signal green. */
 :root {
   --bg: #cfcec8; --p: #fbfbf9; --s1: #ffffff; --s2: #ececE8; --line: #dedcd6;
-  --ink: #202124; --dim: #5f6066; --faint: #9d9ea3; --acc: #12a150; --rec: #e1554a; --on-hl: var(--ink); --hl: 30%;
-  --c-y: #e8b520; --c-g: #3fae6c; --c-p: #e0648f; --c-c: #3b93d1; --c-o: #e57a2e; --c-v: #8a6fd6; --c-r: #e1554a; --c-l: #8fbf2e;
+  --ink: #202124; --dim: #5f6066; --faint: #9d9ea3; --acc: #12a150; --rec: #e1554a; --on-hl: var(--ink); --hl: 40%;
+  --c-y: #e8b520; --c-g: #3fae6c; --c-p: #e0648f; --c-c: #3b93d1; --c-o: #e57a2e; --c-v: #8a6fd6; --c-r: #ac1c0f; --c-l: #695f01;
   --f-text: var(--font-ui), 'Schibsted Grotesk', 'Helvetica Neue', Arial, sans-serif; --f-head: var(--f-text); --f-ui: var(--f-text); --f-chord: var(--f-text);
   --head-w: 800; --head-ls: -0.035em; --head-wdth: 100; --r: 2px; --r-s: 2px; --dev: #1a1a1a;
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) { --bg: #0c0c0d; --p: #18191b; --s1: #212226; --s2: #2b2c30; --line: #34353a; --ink: #f0f0ec; --dim: #a5a6ab; --faint: #6c6d72; --acc: #2fc46e; --hl: 34%; --dev: #2a2a2a; color-scheme: dark }
+  :root:not([data-theme="light"]) { --bg: #0c0c0d; --p: #18191b; --s1: #212226; --s2: #2b2c30; --line: #34353a; --ink: #f0f0ec; --dim: #a5a6ab; --faint: #6c6d72; --acc: #2fc46e; --hl: 44%; --dev: #2a2a2a; color-scheme: dark }
 }
-:root[data-theme="dark"] { --bg: #0c0c0d; --p: #18191b; --s1: #212226; --s2: #2b2c30; --line: #34353a; --ink: #f0f0ec; --dim: #a5a6ab; --faint: #6c6d72; --acc: #2fc46e; --hl: 34%; --dev: #2a2a2a; color-scheme: dark }
+:root[data-theme="dark"] { --bg: #0c0c0d; --p: #18191b; --s1: #212226; --s2: #2b2c30; --line: #34353a; --ink: #f0f0ec; --dim: #a5a6ab; --faint: #6c6d72; --acc: #2fc46e; --hl: 44%; --dev: #2a2a2a; color-scheme: dark }
 
 * { box-sizing: border-box }
 html, body { min-height: 100% }
@@ -992,7 +992,9 @@ button.pv:hover { background: var(--hov) }
 
 /* ---- v7: one calendar (projects optional), today you can't miss, a profile menu, solid glyphs for the key places, a sidebar
    toggle you can see, + and drag on touch, one colour per tag per project in 24 tones, section names as suggestions ---- */
-:root { --c-y1: color-mix(in srgb, var(--c-y) 50%, #fff); --c-y2: color-mix(in srgb, var(--c-y) 64%, #000); --c-g1: color-mix(in srgb, var(--c-g) 50%, #fff); --c-g2: color-mix(in srgb, var(--c-g) 64%, #000); --c-p1: color-mix(in srgb, var(--c-p) 50%, #fff); --c-p2: color-mix(in srgb, var(--c-p) 64%, #000); --c-c1: color-mix(in srgb, var(--c-c) 50%, #fff); --c-c2: color-mix(in srgb, var(--c-c) 64%, #000); --c-o1: color-mix(in srgb, var(--c-o) 50%, #fff); --c-o2: color-mix(in srgb, var(--c-o) 64%, #000); --c-v1: color-mix(in srgb, var(--c-v) 50%, #fff); --c-v2: color-mix(in srgb, var(--c-v) 64%, #000); --c-r1: color-mix(in srgb, var(--c-r) 50%, #fff); --c-r2: color-mix(in srgb, var(--c-r) 64%, #000); --c-l1: color-mix(in srgb, var(--c-l) 50%, #fff); --c-l2: color-mix(in srgb, var(--c-l) 64%, #000); }
+/* the other 16 colours: not lighter and darker copies of the first 8 (those looked the same as a highlight) but
+   different hues and depths, each picked as far as possible from the ones before it once tinted onto the page */
+:root { --c-y2: #0057c0; --c-g2: #91288c; --c-p2: #058d1d; --c-c2: #8c9510; --c-o2: #098777; --c-v2: #a65e4a; --c-r2: #5b5392; --c-l2: #939fe3; --c-y1: #d27bec; --c-g1: #c73758; --c-p1: #9cae65; --c-c1: #48b7c1; --c-o1: #dc8b86; --c-v1: #568247; --c-r1: #3c6cdc; --c-l1: #01668d; }
 
 /* the eye: a window a little wider than the o, the o nudged right of centre because it mostly looks right, at the page;
    the other letters are hidden instead of cropped, so no sliver of the t shows */
@@ -1214,8 +1216,7 @@ button.chip.addc:hover, .pv:hover .chip.addc { color: var(--ink); box-shadow: in
   @page { size: A4; margin: 16mm 15mm 17mm; @bottom-right { content: counter(page); font: 600 8pt var(--font-ui), sans-serif; color: #9d9ea3 } }
   html, body { height: auto !important; min-height: 0 !important; overflow: visible !important; background: #fff !important }
   body > *:not(#printroot) { display: none !important }
-  #printroot { display: block; color: #202124; font: 10.5pt/1.45 var(--font-ui), 'Helvetica Neue', Arial, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact;
-    --c-y: #e8b520; --c-g: #3fae6c; --c-p: #e0648f; --c-c: #3b93d1; --c-o: #e57a2e; --c-v: #8a6fd6; --c-r: #e1554a; --c-l: #8fbf2e }
+  #printroot { display: block; color: #202124; font: 10.5pt/1.45 var(--font-ui), 'Helvetica Neue', Arial, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact }
 }
 #printroot h1, #printroot h2, #printroot p { margin: 0 }
 .pr-logo { width: 13mm; height: auto; color: #202124; flex: none }
@@ -1227,7 +1228,7 @@ button.chip.addc:hover, .pv:hover .chip.addc { color: var(--ink); box-shadow: in
 .pr-h h1 { font-size: 26pt; line-height: 1.02; font-weight: 800; letter-spacing: -0.035em; text-wrap: balance }
 .pr-meta { margin-top: 2.5mm !important; font-size: 10pt; font-weight: 600; color: #5f6066; display: flex; gap: 7px } .pr-meta i { font-style: normal; color: #9d9ea3 }
 .pr-legend { margin-top: 3.5mm !important; display: flex; flex-wrap: wrap; gap: 5px }
-.pr-legend b, .pr-who b { font-size: 6.5pt; font-weight: 600; padding: 0 6px; background: color-mix(in srgb, var(--h) 30%, #fff) }
+.pr-legend b, .pr-who b { font-size: 6.5pt; font-weight: 600; padding: 0 6px; background: color-mix(in srgb, var(--h) 40%, #fff) }
 .pr-body { columns: 2; column-gap: 8mm }
 .pr-sec { margin: 0 0 3mm; break-inside: avoid-column }
 .pr-sec.named { padding-left: 3mm; border-left: 3px solid var(--h) }
@@ -1240,7 +1241,7 @@ button.chip.addc:hover, .pv:hover .chip.addc { color: var(--ink); box-shadow: in
 .pr-w { display: inline-flex; flex-direction: column; vertical-align: bottom }
 .pr-w > i { font-style: normal; font-weight: 800; font-size: 10pt; letter-spacing: -0.02em; min-height: 1.25em; padding-right: 3px; white-space: nowrap }
 .pr-w > span { white-space: pre }
-.pr-w.on > span { background: color-mix(in srgb, var(--h) 30%, #fff); box-shadow: 2px 0 0 color-mix(in srgb, var(--h) 30%, #fff), -2px 0 0 color-mix(in srgb, var(--h) 30%, #fff) }
+.pr-w.on > span { background: color-mix(in srgb, var(--h) 40%, #fff); box-shadow: 2px 0 0 color-mix(in srgb, var(--h) 40%, #fff), -2px 0 0 color-mix(in srgb, var(--h) 40%, #fff) }
 .pr-w.ov > span { text-decoration: underline 2px var(--h2); text-underline-offset: 3px }
 .pr-who { display: flex; flex-wrap: wrap; gap: 2px; justify-content: flex-end; padding-bottom: 2px; max-width: 30mm }
 .pr-who b.ov { background: none; box-shadow: inset 0 -2px 0 var(--h) }

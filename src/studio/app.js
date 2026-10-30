@@ -274,9 +274,9 @@ faroles.changed = new Set([f1[3].id, f2[2].id]); defensa.changed = new Set([d2[1
 /* ---------------- colours ---------------- */
 const HUES = ['y','g','p','c','o','v','r','l'];
 const PALETTE = ['g','p','c','o','v','r','l'];
-// every hue in three tones (light, as is, deep): 24 colours. New tags take the plain tones first, then the deep ones, then the light ones
+// 24 colours (studio.css). New tags take them in this order, each the most different from the ones before it
 const AUTO = [...PALETTE, ...HUES.map(h => h + '2'), ...HUES.map(h => h + '1')];
-const SWATCHES = ['1', '', '2'].flatMap(t => HUES.map(h => h + t));
+const SWATCHES = ['o1', 'r', 'v2', 'o', 'y', 'l', 'c2', 'p1', 'v1', 'p2', 'g', 'o2', 'c1', 'l1', 'c', 'y2', 'r1', 'l2', 'r2', 'v', 'y1', 'g2', 'p', 'g1']; // by hue
 const projOfSong = (song) => PROJECTS.find(p => p.songs.includes(song) || p.published?.songs.includes(song)) ?? PROJECTS.find(p => p.songs.some(x => x.id === song.id));
 // a colour nobody in the project has yet; once all are taken, at least one that isn't on the lines around
 function pickColor(map, song, rowId) {
