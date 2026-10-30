@@ -9,6 +9,10 @@ export type StudioStore = {
   // only the project's organisers can (the database checks); missing in the demo, where you organise everything
   removeMember?(projectId: string, userId: string): Promise<void>;
   setRole?(projectId: string, userId: string, role: 'edita' | 'organiza'): Promise<void>;
+  // a project's files: kept in storage under <project>/<file>, opened through a link that lasts an hour
+  upload(path: string, file: File): Promise<void>;
+  fileUrl(path: string): Promise<string>;
+  removeFile(path: string): Promise<void>;
 };
 
 export type StudioData = {
@@ -54,6 +58,19 @@ export function supabaseStore(sb: SupabaseClient): StudioStore {
     setRole: async (projectId, userId, role) => {
       await call('set_member_role', { p_project: projectId, p_user: userId, p_role: role });
     },
+    upload: async (path, file) => {
+      const { error } = await sb.storage.from('files').upload(path, file, { contentType: file.type, upsert: false });
+      if (error) throw error;
+    },
+    fileUrl: async (path) => {
+      const { data, error } = await sb.storage.from('files').createSignedUrl(path, 3600);
+      if (error) throw error;
+      return data.signedUrl;
+    },
+    removeFile: async (path) => {
+      const { error } = await sb.storage.from('files').remove([path]);
+      if (error) throw error;
+    },
   };
 }
 
@@ -75,7 +92,19 @@ export function loadLocal(): StudioData {
 }
 
 export function localStore(): StudioStore {
+  const files = new Map<string, string>(); // in the demo, files stay in this tab only
   return {
+    async upload(path, file) {
+      files.set(path, URL.createObjectURL(file));
+    },
+    async fileUrl(path) {
+      const u = files.get(path);
+      if (!u) throw new Error('Este archivo de prueba ya no está');
+      return u;
+    },
+    async removeFile(path) {
+      files.delete(path);
+    },
     async project(id, doc, published, version, deleted) {
       const db = readLocal();
       const row = db.projects.find((p) => p.id === id);
