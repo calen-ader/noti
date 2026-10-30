@@ -534,13 +534,13 @@ function printSongV(p, song, n) {
   const who = [...new Set(rowsOf(song).flatMap(r => whoOfRow(song, r)))];
   const note = (at) => song.notes?.[at] ? `<p class="pr-note">${esc(song.notes[at])}</p>` : '';
   const secs = song.secs.map(sec => {
-    const rows = sec.rows.filter(r => r.kind === 'bars' ? r.bars.length : !isEmptyRow(r)); if (!rows.length && !sec.name) return '';
-    const head = sec.name || song.secs.length > 1 ? `<h2>${esc(sec.name || (EN ? 'Part' : 'Parte'))}${sec.rep > 1 ? `<span>×${sec.rep}</span>` : ''}${sec.ts ? `<span>${esc(sec.ts)}</span>` : ''}</h2>` : '';
+    const rows = sec.rows.filter(r => r.kind === 'bars' ? r.bars.some(x => x.length) : !isEmptyRow(r)); if (!rows.length && !sec.name) return '';
+    const head = sec.name ? `<h2>${esc(sec.name)}${sec.rep > 1 ? `<span>×${sec.rep}</span>` : ''}${sec.ts ? `<span>${esc(sec.ts)}</span>` : ''}</h2>` : '';
     return `<section class="pr-sec" style="--h:${cv(secCol(sec))}">${head}${note(sec.id)}${rows.map(r => `<div class="pr-row">${r.kind === 'bars' ? printBarsV(r) : `${printWordsV(song, r, colors)}<span class="pr-who">${lineWho(song, r, colors)}</span>`}${note(r.id)}</div>`).join('')}</section>`;
   }).join('');
   return `<article class="pr-song"><header class="pr-h"><div class="pr-top"><span class="pr-proj" style="--pc:${p.pc}"><i></i>${esc(p.name || (EN ? 'Untitled' : 'Sin nombre'))}${n ? ` · ${String(n).padStart(2, '0')}` : ''}</span>${notiLogoSvg('class="pr-logo"')}</div>
     <h1>${esc(titleOf(song) === 'Canción sin título' && EN ? 'Untitled song' : titleOf(song))}</h1>${meta.length ? `<p class="pr-meta">${meta.map(esc).join('<i>·</i>')}</p>` : ''}
-    ${who.length ? `<p class="pr-legend">${who.map(w => `<b style="--h:${cv(colors[w])}">${esc(nameOf(w))}</b>`).join('')}</p>` : ''}</header>${secs}</article>`;
+    ${who.length ? `<p class="pr-legend">${who.map(w => `<b style="--h:${cv(colors[w])}">${esc(nameOf(w))}</b>`).join('')}</p>` : ''}</header><div class="pr-body">${secs}</div></article>`;
 }
 function printDocV(p, songs, book) {
   if (!book) return printSongV(p, songs[0], 0);
