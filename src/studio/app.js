@@ -557,10 +557,9 @@ function printSongV(p, song, n) {
 function printDocV(p, songs, book) {
   if (!book) return printSongV(p, songs[0], 0);
   const n = songs.length, when = dayLong(TODAY);
-  const cover = `<section class="pr-cover" style="--pc:${p.pc}">${notiLogoSvg('class="pr-logo"')}<div><h1>${esc(p.name || (EN ? 'Untitled' : 'Sin nombre'))}</h1>
-    <p>${EN ? `${n} ${n === 1 ? 'song' : 'songs'}` : `${n} ${n === 1 ? 'canción' : 'canciones'}`} · ${esc(when)}</p></div><i class="pr-band"></i></section>`;
-  const index = `<section class="pr-index"><h2>${EN ? 'Songs' : 'Canciones'}</h2><ol>${songs.map((s, i) => `<li><span>${String(i + 1).padStart(2, '0')}</span><b>${esc(titleOf(s))}</b><small>${isSet(s, 'key') && s.key ? esc(keyName(s.key)) : ''}</small></li>`).join('')}</ol></section>`;
-  return cover + index + songs.map((s, i) => printSongV(p, s, i + 1)).join('');
+  // no cover: the project's name heads the song list
+  const index = `<section class="pr-index" style="--pc:${p.pc}"><div class="pr-top"><span class="pr-proj"><i></i>${EN ? `${n} ${n === 1 ? 'song' : 'songs'}` : `${n} ${n === 1 ? 'canción' : 'canciones'}`} · ${esc(when)}</span>${notiLogoSvg('class="pr-logo"')}</div><h1 class="pr-pname">${esc(p.name || (EN ? 'Untitled' : 'Sin nombre'))}</h1><ol>${songs.map((s, i) => `<li><span>${String(i + 1).padStart(2, '0')}</span><b>${esc(titleOf(s))}</b><small>${isSet(s, 'key') && s.key ? esc(keyName(s.key)) : ''}</small></li>`).join('')}</ol></section>`;
+  return index + songs.map((s, i) => printSongV(p, s, i + 1)).join('');
 }
 function exportPdf(p, songs, book) {
   if (!songs.length) return toast('No hay canciones para exportar');
