@@ -29,5 +29,7 @@ On Vercel, add both env vars as Config (not Secret): `NEXT_PUBLIC_` values ship 
   join a project as an editor (`/unirse/<token>`), and `/demo` (example songs kept in the browser)
 - `supabase/migrations/0002_studio.sql` projects, songs, members and profiles, with versioned saves;
   `0001` holds the first version's tables, no longer used by the app
+- `supabase/migrations/0004_files.sql` the private `files` storage bucket for project files (one folder per
+  project, open only to its people); the list of files lives in the project's own document
 - `src/lib/logo/noti-hero.js` the animated wordmark (from the logo motion work, kept as one file)
 - `src/lib/sheet/` the first version's sheet model and its tests

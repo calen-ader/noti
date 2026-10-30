@@ -699,9 +699,50 @@ function meV() {
     <label class="mrow2"><span>La semana empieza</span><select id="wkstart"><option value="1"${S.weekStart === 1 ? ' selected' : ''}>el lunes</option><option value="0"${S.weekStart === 0 ? ' selected' : ''}>el domingo</option></select></label>
     <hr>${boot.setPassword ? '<button data-setpass>Contraseña</button>' : ''}<button data-keys>Atajos de teclado</button>${boot.signOut ? '<button data-signout>Cerrar sesión</button>' : ''}</div>`;
 }
+/* a project's files: PDFs, images and audio, each optionally linked to songs and dates */
+const FILE_MAX = 20 * 1024 * 1024;
+const fileKind = (f) => f.mime === 'application/pdf' ? 'PDF' : f.mime?.startsWith('image/') ? 'IMG' : f.mime?.startsWith('audio/') ? 'AUDIO' : 'ARCH';
+const fileSize = (n) => n >= 1048576 ? `${(n / 1048576).toFixed(1).replace('.0', '')} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
+function fileLinks(p, f) {
+  const songs = (f.songs ?? []).map(id => p.songs.find(x => x.id === id)).filter(Boolean).map(x => `<span class="chip">${esc(titleOf(x))}</span>`);
+  const dates = (f.evs ?? []).map(id => EVENTS.find(e => e.id === id)).filter(Boolean).map(e => `<span class="chip evd">${dayShort(e.date)} · ${esc(evTitle(e))}</span>`);
+  return songs.concat(dates).join('');
+}
+function filesV(p) {
+  const list = p.files ?? [];
+  const row = (f) => `<div class="frow${f.busy ? ' busy' : ''}"><span class="fk k-${fileKind(f).toLowerCase()}">${fileKind(f)}</span>
+    <button class="fn" data-fopen="${esc(f.id)}"${f.busy ? ' disabled' : ''}><b>${esc(f.name)}</b><small>${f.busy ? 'Subiendo…' : `${fileSize(f.size)} · ${esc(f.by || '')} · ${dayShort(f.at)}`}</small></button>
+    <span class="flinks">${fileLinks(p, f)}</span>
+    ${f.busy ? '' : `<span class="fa"><button class="b" data-flink="${esc(f.id)}" aria-expanded="${S.menu?.kind === 'flink' && S.menu.id === f.id}">Vincular</button><button class="b${S.fdel === f.id ? ' danger' : ''}" data-fdel="${esc(f.id)}">${S.fdel === f.id ? '¿Borrar?' : 'Borrar'}</button></span>`}</div>`;
+  return `<div class="files" id="filedrop">${list.length ? list.map(row).join('') : '<p class="empty1">Sin archivos todavía. Partituras, fotos de la pizarra, pistas: lo que el grupo necesite tener a mano.</p>'}
+    <label class="b add fup">+ Subir archivo<input id="fileup" type="file" multiple accept="application/pdf,image/*,audio/*" hidden></label><p class="fhint">PDF, imágenes o audio, hasta 20 MB cada uno. También podés soltarlos acá.</p></div>`;
+}
+async function addFiles(list) {
+  const p = proj(); if (!p || !boot.store?.upload) return toast('Los archivos todavía no están disponibles acá');
+  for (const file of list) {
+    if (!/^(application\/pdf|image\/|audio\/)/.test(file.type)) { toast(`${file.name}: solo PDF, imágenes o audio`); continue; }
+    if (file.size > FILE_MAX) { toast(`${file.name} pesa más de 20 MB`); continue; }
+    const id = uid('f'), ext = ((file.name.split('.').pop() || '').toLowerCase().match(/^[a-z0-9]{1,5}$/) || ['bin'])[0];
+    const f = { id, name: file.name.replace(/[<>"'&`;{}\\]/g, '').slice(0, 120) || 'archivo', path: `${p.id}/${id}.${ext}`, mime: file.type, size: file.size, by: ME, at: TODAY, songs: [], evs: [], busy: true };
+    (p.files ??= []).push(f); render();
+    try { await boot.store.upload(f.path, file); delete f.busy; }
+    catch (err) { console.warn('Noti: no se pudo subir', err); p.files = p.files.filter(x => x !== f); toast(`No se pudo subir ${f.name}`); }
+    render();
+  }
+}
+async function openFile(f) {
+  const w = window.open('', '_blank'); // opened right away so the browser doesn't block it, then pointed at the file
+  try { const url = await boot.store.fileUrl(f.path); if (w) w.location.href = url; else location.href = url; }
+  catch (err) { w?.close(); console.warn('Noti: no se pudo abrir', err); toast('No se pudo abrir el archivo'); }
+}
 function menuV() {
   const M = S.menu;
   if (M.kind === 'me') return meV();
+  if (M.kind === 'flink') { const p = proj(); const f = p.files?.find(x => x.id === M.id); if (!f) return '';
+    const evsP = evs(p).filter(e => e.date >= TODAY || f.evs?.includes(e.id)).map(e => ({ e })).sort(byWhen).map(x => x.e);
+    const tick = (on) => `<i class="tick${on ? ' on' : ''}" aria-hidden="true"></i>`;
+    return `<div class="pop menu flm"><div class="mlab">Canciones</div>${p.songs.length ? p.songs.map(x => `<button data-flsong="${esc(f.id)}|${esc(x.id)}" aria-pressed="${!!f.songs?.includes(x.id)}">${tick(f.songs?.includes(x.id))}${esc(titleOf(x))}</button>`).join('') : '<p class="mnone">Sin canciones</p>'}
+      <div class="mlab">Fechas</div>${evsP.length ? evsP.map(e => `<button data-flev="${esc(f.id)}|${esc(e.id)}" aria-pressed="${!!f.evs?.includes(e.id)}">${tick(f.evs?.includes(e.id))}${dayShort(e.date)} · ${esc(evTitle(e))}</button>`).join('') : '<p class="mnone">Sin fechas próximas</p>'}</div>`; }
   if (M.kind === 'insert') return `<div class="pop menu ins"><div class="mlab">Insertar</div>${insItems()}</div>`;
   if (M.kind === 'sec') {
     const sec = cur().secs.find(x => x.id === M.id); const i = cur().secs.indexOf(sec);
@@ -735,6 +776,7 @@ function project() {
       <button class="b add" data-sharepop>+ Invitar</button>
       ${p.people ? `<div><h3>Grupos</h3>${crew(p).groups.filter(g => g.id !== 'todxs').map(g => `<div class="grp"><b>${esc(g.label)}</b><span>${g.members.join(', ')}</span></div>`).join('')}</div>`
         : `<div><h3>Grupos</h3><button class="b add" data-addpeople>+ Crear un grupo</button></div>`}</div>`;
+  if (tab === 'archivos') pane = filesV(p);
   if (tab === 'fechas') { const all = evs(p).map(e => ({ e, p })).sort(byWhen), up = all.filter(x => x.e.date >= TODAY), past = all.filter(x => x.e.date < TODAY).reverse();
     pane = `<div class="agroup">${up.length ? up.map(x => evRow(x, { noProj: true })).join('') : '<p class="empty1">Nada próximo.</p>'}</div>
       <div class="evbtns"><button class="b add" data-newev="${p.id}|">+ Evento</button><button class="b" data-go="cal">Ver en el calendario</button></div>
@@ -742,7 +784,7 @@ function project() {
   return `<div class="top">${sideBtn()}<span class="crumbs"><span class="crumb cur">${esc(p.name || 'Sin nombre')}</span></span><span class="sp"></span><button class="b" data-sharepop>Compartir</button>${pubBtn(p)}<button class="b more" data-pmenu aria-label="Opciones del proyecto">···</button></div>
   <div class="scroll"><div class="proj">
     <header class="ph"><h1 class="h1" data-pname${ed ? ' contenteditable="plaintext-only" class="editing"' : ''} data-ph="Sin nombre">${esc(p.name)}</h1>${nextLine(p)}${descV('proj', p.desc, 'Notas del proyecto')}</header>
-    <div class="tabrow"><nav class="tabs2" role="tablist">${[['canciones', 'Canciones'], ['fechas', 'Eventos'], ['personas', 'Personas']].map(([k, t]) => `<button class="b" role="tab" aria-selected="${tab === k}" data-ptab="${k}">${t}${k === 'fechas' && upcoming(p).length ? ` <small class="quiet0">${upcoming(p).length}</small>` : ''}</button>`).join('')}</nav>${tab === 'canciones' && p.songs.length ? vsw('sview', [['hojas', 'Hojas'], ['lista', 'Lista']]) : ''}</div>
+    <div class="tabrow"><nav class="tabs2" role="tablist">${[['canciones', 'Canciones'], ['fechas', 'Eventos'], ['archivos', 'Archivos'], ['personas', 'Personas']].map(([k, t]) => `<button class="b" role="tab" aria-selected="${tab === k}" data-ptab="${k}">${t}${k === 'fechas' && upcoming(p).length ? ` <small class="quiet0">${upcoming(p).length}</small>` : ''}</button>`).join('')}</nav>${tab === 'canciones' && p.songs.length ? vsw('sview', [['hojas', 'Hojas'], ['lista', 'Lista']]) : ''}</div>
     ${pane}
   </div></div>`;
 }
@@ -760,6 +802,7 @@ function editor() {
   const props = `<div class="props">${lanes || !isSet(song, 'key') ? `<span class="pk">Tono</span>${isSet(song, 'key') ? `<button class="pv" data-pop="meta">${keyName(song.key)}</button>`
         : guess ? `<span class="pv"><button class="chip keyq" data-keyok title="Usar este tono">${EN ? '' : '¿'}${keyName(song.key)}?</button><button class="chip addc" data-pop="meta">Otro</button></span>` : `<button class="pv" data-pop="meta">${add('Agregar tono')}</button>`}` : ''}
       <span class="pk">Tempo</span><button class="pv" data-pop="meta">${isSet(song, 'bpm') ? `${song.bpm} bpm` : add('Agregar tempo')}${isSet(song, 'ts') ? `<span class="tsv">${isSet(song, 'bpm') ? ' · ' : ''}${song.ts}</span>` : add('Agregar métrica')}</button>
+      ${(() => { const fs = (p.files ?? []).filter(f => !f.busy && f.songs?.includes(song.id)); return fs.length ? `<span class="pk">Archivos</span><span class="pv">${fs.map(f => `<button class="chip fch" data-fopen="${esc(f.id)}"><i class="fk k-${fileKind(f).toLowerCase()}">${fileKind(f)}</i>${esc(f.name)}</button>`).join('')}</span>` : ''; })()}
       <span class="pk">Etiquetas</span><span class="pv">${cast.length ? cast.map(x => `<span class="chip" style="--h:${cv(x.c)}">${esc(nameOf(x.w))}</span>`).join('') : '<span class="quiet0">Ninguna</span>'}</span>
       ${(() => { const on = upcoming().filter(x => x.e.songs.includes(song.id)).slice(0, 3); return on.length ? `<span class="pk">Eventos</span><span class="pv">${on.map(x => `<button class="chip evc" data-ev="${x.e.id}">${dayShort(x.e.date)} · ${esc(evTitle(x.e))}</button>`).join('')}</span>` : ''; })()}
       ${p.shared ? `<span class="pk">Estado</span><span class="pv">${song.changed.size ? '<span class="chip draft">Sin publicar</span>' : '<span class="chip ok">Publicada</span>'}</span>` : ''}</div>`;
@@ -1823,7 +1866,14 @@ function handle(b, e, over) {
     const p = { id: uid('p'), name: '', when: '', owner: ME, pc: 'var(--c-v)', pf: '#111', editors: [[ME, 'organiza']], people: false, shared: false, songs: [], tags: [], version: 0, note: '', invite: token() };
     snapshot(p); PROJECTS.push(p); S.pid = p.id; S.screen = 'project'; S.ptab = 'canciones'; S.editing = { kind: 'pname' }; render(); return true;
   }
-  if (d.ptab) { S.ptab = d.ptab; render(); return true; }
+  if (d.ptab) { S.ptab = d.ptab; S.fdel = null; render(); return true; }
+  if (d.fopen) { const f = proj()?.files?.find(x => x.id === d.fopen); if (f) openFile(f); return true; }
+  if (d.flink) { S.menu = S.menu?.kind === 'flink' && S.menu.id === d.flink ? null : { kind: 'flink', id: d.flink, q: `[data-flink="${d.flink}"]` }; render(); return true; }
+  if (d.flsong || d.flev) { const [fid, x] = (d.flsong || d.flev).split('|'); const f = proj()?.files?.find(y => y.id === fid); if (!f) return true;
+    const k = d.flsong ? 'songs' : 'evs'; f[k] = f[k]?.includes(x) ? f[k].filter(y => y !== x) : [...(f[k] ?? []), x]; render(); return true; }
+  if (d.fdel) { const p = proj(); const f = p.files?.find(x => x.id === d.fdel); if (!f) return true;
+    if (S.fdel !== f.id) { S.fdel = f.id; render(); return true; } // first tap asks, second deletes
+    S.fdel = null; p.files = p.files.filter(x => x !== f); render(); boot.store?.removeFile?.(f.path).catch(err => console.warn('Noti: no se pudo borrar', err)); toast(`Borraste ${f.name}`); return true; }
   if (d.open) { openSong(+d.open); return true; }
   if ('newsong' in d) {
     const s = Song('', 'C', 90, '4/4', [Sec('', [L('')])]); s.keyAuto = true; s.secs[0].auto = true; s.open = ['key', 'bpm', 'ts'];
@@ -1931,6 +1981,10 @@ function makeTag(raw) {
 }
 function openSong(i) { stopSong(false); S.si = i; const os = proj()?.songs[i]; if (os) S.recentS = [os.id, ...S.recentS.filter(x => x !== os.id)].slice(0, 8); S.ev = null; S.screen = 'song'; S.lastRow = null; S.hist = []; clearSel(); S.editing = null; S.composer = null; render(); }
 
+document.addEventListener('change', (e) => { if (e.target.id === 'fileup' && e.target.files?.length) { addFiles([...e.target.files]); e.target.value = ''; } });
+document.addEventListener('dragover', (e) => { if (S.screen === 'project' && S.ptab === 'archivos' && e.dataTransfer?.types.includes('Files')) { e.preventDefault(); document.getElementById('filedrop')?.classList.add('over'); } });
+document.addEventListener('dragleave', (e) => { if (!e.relatedTarget) document.getElementById('filedrop')?.classList.remove('over'); });
+document.addEventListener('drop', (e) => { if (S.screen === 'project' && S.ptab === 'archivos' && e.dataTransfer?.files.length) { e.preventDefault(); addFiles([...e.dataTransfer.files]); } });
 document.addEventListener('keydown', (e) => {
   const el = e.target;
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k' && S.dev !== 'alumno' && S.screen !== 'signin' && !S.reh) { e.preventDefault(); commitEditing(); S.search = S.search ? null : { q: '', active: 0 }; render(); return; }
@@ -2189,8 +2243,8 @@ let th = 'system', lk = 'cinta'; try { th = localStorage.getItem('noti-theme') |
 // as its own, and your profile. A version number per document catches two people saving the same thing at once.
 const enc = (x) => JSON.stringify(x, (k, v) => v instanceof Set ? { $set: [...v] } : v);
 const dec = (x) => x == null ? x : JSON.parse(JSON.stringify(x), (k, v) => v && typeof v === 'object' && Array.isArray(v.$set) ? new Set(v.$set) : v);
-const PKEYS = ['name', 'desc', 'when', 'owner', 'pc', 'pf', 'people', 'shared', 'tags', 'cast', 'colors', 'version', 'note', 'orderDirty', 'link', 'invite'];
-function projDoc(p) { const d = {}; for (const k of PKEYS) if (p[k] !== undefined) d[k] = p[k]; d.order = p.songs.map(x => x.id); d.events = EVENTS.filter(e => e.pid === p.id); return d; }
+const PKEYS = ['files', 'name', 'desc', 'when', 'owner', 'pc', 'pf', 'people', 'shared', 'tags', 'cast', 'colors', 'version', 'note', 'orderDirty', 'link', 'invite'];
+function projDoc(p) { const d = {}; for (const k of PKEYS) if (p[k] !== undefined) d[k] = p[k]; if (d.files) d.files = d.files.filter(f => !f.busy).map(({ busy, ...f }) => f); d.order = p.songs.map(x => x.id); d.events = EVENTS.filter(e => e.pid === p.id); return d; }
 const profDoc = () => [S.myName, { avatar: S.avatar, weekStart: S.weekStart, events: EVENTS.filter(e => !e.pid), recentS: S.recentS }];
 const saved = new Map(); // what the database has: key -> { json, v, conflict }
 let saveTimer = 0, saving = null, retryTimer = 0;
