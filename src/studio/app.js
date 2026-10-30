@@ -1,6 +1,6 @@
 // Noti's studio: the whole app as one plain module, ported from the v7 prototype. mount() draws into the
 // page's stage and gets from the page who is signed in, the data, and how to save it (see Studio.tsx).
-import { mountNotiHero } from '@/lib/logo/noti-hero';
+import { mountNotiHero, notiLogoSvg } from '@/lib/logo/noti-hero';
 import { LANG, setLang, translateTree, watchTranslate } from './i18n';
 
 const EN = LANG === 'en';
@@ -535,6 +535,58 @@ function secV(song, sec, colors, only) {
     ${sec.rows.map(r => r.kind === 'bars' ? barsV(song, sec, r) : lineV(song, r, colors, only)).join('')}`}</section>`;
 }
 
+/* ---------------- PDF ---------------- */
+// A song or a whole project laid out for paper and handed to the browser's print dialog, where "Save as PDF" makes
+// the file. Drawn outside the studio's stage, so it's always light and never translated by the table: the few words
+// it adds are made in the right language here, and everything else is what people wrote.
+function printWordsV(song, r, colors) {
+  const m = song.main[r.id] ?? {}, ov = song.ov[r.id] ?? {}; const ch = Object.keys(r.chords).length > 0;
+  return `<p class="pr-tx${ch ? ' ch' : ''}">${r.words.map((w, i) => {
+    const who = m[i], o = ov[i], c = r.chords[i];
+    const st = (who ? `--h:${cv(colors[who])};` : '') + (o ? `--h2:${cv(colors[o.who])};` : '');
+    return `<span class="pr-w${who ? ' on' : ''}${o ? ' ov' : ''}"${st ? ` style="${st}"` : ''}>${ch ? `<i>${c ? esc(c) : ''}</i>` : ''}<span>${esc(w)}</span></span>`;
+  }).join(' ')}</p>`;
+}
+function printBarsV(r) {
+  const rp = r.rep > 1;
+  return `<div class="pr-bars${rp ? ' rp' : ''}">${r.bars.map((b, i) => {
+    const sim = b[0] === '%';
+    return `<div class="pr-bar${rp && i === 0 ? ' rs' : ''}${i === r.bars.length - 1 ? ' last' : ''}${rp && i === r.bars.length - 1 ? ' re' : ''}${b.length > 3 ? ' tight' : ''}" style="--n:${sim || !b.length ? 1 : b.length}">${sim ? '<b class="sim">%</b>' : b.map(c => `<b>${c === '.' ? '' : esc(c)}</b>`).join('')}</div>`;
+  }).join('')}${rp ? `<span class="pr-x">×${r.rep}</span>` : ''}</div>`;
+}
+function printSongV(p, song, n) {
+  const colors = colorsFor(song);
+  const meta = [isSet(song, 'key') && song.key ? keyName(song.key) : '', isSet(song, 'bpm') && song.bpm ? `${song.bpm} bpm` : '', isSet(song, 'ts') && song.ts ? song.ts : ''].filter(Boolean);
+  const who = [...new Set(rowsOf(song).flatMap(r => whoOfRow(song, r)))];
+  const note = (at) => song.notes?.[at] ? `<p class="pr-note">${esc(song.notes[at])}</p>` : '';
+  const secs = song.secs.map(sec => {
+    const rows = sec.rows.filter(r => r.kind === 'bars' ? r.bars.length : !isEmptyRow(r)); if (!rows.length && !sec.name) return '';
+    const head = sec.name || song.secs.length > 1 ? `<h2>${esc(sec.name || (EN ? 'Part' : 'Parte'))}${sec.rep > 1 ? `<span>×${sec.rep}</span>` : ''}${sec.ts ? `<span>${esc(sec.ts)}</span>` : ''}</h2>` : '';
+    return `<section class="pr-sec" style="--h:${cv(secCol(sec))}">${head}${note(sec.id)}${rows.map(r => `<div class="pr-row">${r.kind === 'bars' ? printBarsV(r) : `${printWordsV(song, r, colors)}<span class="pr-who">${lineWho(song, r, colors)}</span>`}${note(r.id)}</div>`).join('')}</section>`;
+  }).join('');
+  return `<article class="pr-song"><header class="pr-h"><div class="pr-top"><span class="pr-proj" style="--pc:${p.pc}"><i></i>${esc(p.name || (EN ? 'Untitled' : 'Sin nombre'))}${n ? ` · ${String(n).padStart(2, '0')}` : ''}</span>${notiLogoSvg('class="pr-logo"')}</div>
+    <h1>${esc(titleOf(song) === 'Canción sin título' && EN ? 'Untitled song' : titleOf(song))}</h1>${meta.length ? `<p class="pr-meta">${meta.map(esc).join('<i>·</i>')}</p>` : ''}
+    ${who.length ? `<p class="pr-legend">${who.map(w => `<b style="--h:${cv(colors[w])}">${esc(nameOf(w))}</b>`).join('')}</p>` : ''}</header>${secs}</article>`;
+}
+function printDocV(p, songs, book) {
+  if (!book) return printSongV(p, songs[0], 0);
+  const n = songs.length, when = dayLong(TODAY);
+  const cover = `<section class="pr-cover" style="--pc:${p.pc}">${notiLogoSvg('class="pr-logo"')}<div><h1>${esc(p.name || (EN ? 'Untitled' : 'Sin nombre'))}</h1>
+    <p>${EN ? `${n} ${n === 1 ? 'song' : 'songs'}` : `${n} ${n === 1 ? 'canción' : 'canciones'}`} · ${esc(when)}</p></div><i class="pr-band"></i></section>`;
+  const index = `<section class="pr-index"><h2>${EN ? 'Songs' : 'Canciones'}</h2><ol>${songs.map((s, i) => `<li><span>${String(i + 1).padStart(2, '0')}</span><b>${esc(titleOf(s))}</b><small>${isSet(s, 'key') && s.key ? esc(keyName(s.key)) : ''}</small></li>`).join('')}</ol></section>`;
+  return cover + index + songs.map((s, i) => printSongV(p, s, i + 1)).join('');
+}
+function exportPdf(p, songs, book) {
+  if (!songs.length) return toast('No hay canciones para exportar');
+  let root = document.getElementById('printroot');
+  if (!root) { root = document.createElement('div'); root.id = 'printroot'; document.body.appendChild(root); }
+  root.innerHTML = printDocV(p, songs, book);
+  // the PDF is named after the page's title
+  const was = document.title; document.title = book ? (p.name || 'Noti') : `${titleOf(songs[0])}${p.name ? ` · ${p.name}` : ''}`;
+  addEventListener('afterprint', () => { document.title = was; root.innerHTML = ''; }, { once: true });
+  (document.fonts?.ready ?? Promise.resolve()).then(() => requestAnimationFrame(() => print()));
+}
+
 /* ---------------- views ---------------- */
 // stage: the element the page gave us
 let lastView = '';
@@ -791,10 +843,10 @@ function menuV() {
       ${lyric ? '' : `<div class="mlab">Repetir la línea</div>${repStep(l.row)}`}
       <button data-mact="rowdel" class="danger">Borrar</button></div>`;
   }
-  if (M.kind === 'song') return `<div class="pop menu">${M.here ? '<button data-mact="sreh">Ensayar</button><button data-mact="sshare">Compartir</button>' : ''}<button data-mact="rename">Renombrar</button><button data-mact="dup">Duplicar</button>${PROJECTS.length > 1 ? '<button data-mact="move">Mover a…</button>' : ''}<button data-mact="del" class="danger">Borrar canción</button></div>`;
+  if (M.kind === 'song') return `<div class="pop menu">${M.here ? '<button data-mact="sreh">Ensayar</button><button data-mact="sshare">Compartir</button>' : ''}<button data-mact="rename">Renombrar</button><button data-mact="dup">Duplicar</button><button data-mact="pdf">Exportar PDF</button>${PROJECTS.length > 1 ? '<button data-mact="move">Mover a…</button>' : ''}<button data-mact="del" class="danger">Borrar canción</button></div>`;
   if (M.kind === 'move') return `<div class="pop menu"><div class="mlab">Mover a</div>${PROJECTS.filter(x => x.id !== (M.pid || S.pid)).map(x => `<button class="mvp" data-moveto="${x.id}" style="--pc:${x.pc}"><i class="sq"></i>${esc(x.name || 'Sin nombre')}</button>`).join('')}</div>`;
   if (M.kind === 'share') return shareV();
-  return `<div class="pop menu">${proj(M.pid || S.pid)?.songs.length ? '<button data-mact="preh">Ensayar todo</button>' : ''}<button data-mact="prename">Renombrar</button><button data-mact="pdup">Duplicar</button>${isAdmin(proj(M.pid || S.pid)) ? '<button data-mact="pdel" class="danger">Borrar proyecto</button>' : ''}</div>`;
+  return `<div class="pop menu">${proj(M.pid || S.pid)?.songs.length ? '<button data-mact="preh">Ensayar todo</button>' : ''}<button data-mact="prename">Renombrar</button><button data-mact="pdup">Duplicar</button>${proj(M.pid || S.pid)?.songs.length ? '<button data-mact="ppdf">Exportar PDF</button>' : ''}${isAdmin(proj(M.pid || S.pid)) ? '<button data-mact="pdel" class="danger">Borrar proyecto</button>' : ''}</div>`;
 }
 function project() {
   const p = proj(); const tab = S.ptab; const ed = S.editing?.kind === 'pname';
@@ -1869,6 +1921,8 @@ function handle(b, e, over) {
     const M = S.menu, p = proj(M.pid || S.pid); S.menu = null;
     if (M.kind === 'sec' || M.kind === 'row') { blockAct(M, d.mact, d.as); return true; }
     if (d.mact === 'move') { S.menu = { ...M, kind: 'move' }; render(); return true; }
+    if (d.mact === 'pdf') { render(); exportPdf(p, [p.songs[M.here ? S.si : M.i]].filter(Boolean), false); return true; }
+    if (d.mact === 'ppdf') { render(); exportPdf(p, p.songs, true); return true; }
     if (d.mact === 'sreh') { startReh(rehList('song')); return true; }
     if (d.mact === 'sshare') { S.menu = { kind: 'share' }; render(); return true; }
     if (d.mact === 'preh') { S.pid = p.id; startReh(rehList('proj')); return true; }
