@@ -1223,7 +1223,8 @@ button.chip.addc:hover, .pv:hover .chip.addc { color: var(--ink); box-shadow: in
 .pr-legend { margin-top: 3.5mm !important; display: flex; flex-wrap: wrap; gap: 5px }
 .pr-legend b, .pr-who b { font-size: 6.5pt; font-weight: 600; padding: 0 6px; background: color-mix(in srgb, var(--h) 30%, #fff) }
 .pr-body { columns: 2; column-gap: 8mm }
-.pr-sec { margin: 0 0 3mm; padding-left: 3mm; border-left: 3px solid var(--h); break-inside: avoid-column }
+.pr-sec { margin: 0 0 3mm; break-inside: avoid-column }
+.pr-sec.named { padding-left: 3mm; border-left: 3px solid var(--h) }
 .pr-sec:has(> .pr-row:nth-child(9)) { break-inside: auto }
 .pr-sec h2 { font-size: 9pt; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; display: flex; gap: 7px; break-after: avoid; margin-bottom: 1.5mm }
 .pr-sec h2 span { color: #5f6066; letter-spacing: 0 }

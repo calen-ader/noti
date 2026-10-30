@@ -425,11 +425,23 @@ function seedTagColors(song, ids) { const map = colorsFor(song); for (const id o
 function colorPreview(song, who) { const map = colorsFor(song); return map[who] ?? pickColor(map, song, S.sel[0]?.row); }
 
 /* ---------------- render pieces ---------------- */
-function lineWho(song, r, colors) {
-  const out = []; const seen = new Set();
-  for (const w of Object.values(song.main[r.id] ?? {})) if (!seen.has(w)) { seen.add(w); out.push(`<b style="--h:${cv(colors[w])}">${esc(nameOf(w))}</b>`); }
+// who sings a line, said once: a name shows on the line where that singer comes in and not again until someone else
+// does (the legend has the full list). A group goes by its short name, "Coro" for "Coro (Sabri, Agus Q, Agus P)".
+const shortName = (id) => nameOf(id).replace(/\s*\([^)]*\)\s*$/, '') || nameOf(id);
+const whoParts = (song, r) => {
+  const main = [...new Set(Object.values(song.main[r.id] ?? {}))];
   const ovs = new Map(); for (const o of Object.values(song.ov[r.id] ?? {})) ovs.set(o.who + o.role, o);
-  for (const o of ovs.values()) out.push(`<b class="ov" style="--h:${cv(colors[o.who])}">${o.role ? o.role + ' ' : ''}${esc(nameOf(o.who))}</b>`);
+  return { main, ovs: [...ovs.values()] };
+};
+function lineWho(song, r, colors) {
+  const { main, ovs } = whoParts(song, r);
+  const at = findRow(song, r.id); let prev = null;
+  if (at) for (let i = at.i - 1; i >= 0; i--) { const x = at.sec.rows[i]; if (x.kind === 'lyric' && !isEmptyRow(x)) { prev = whoParts(song, x); break; } }
+  const same = (a, b) => a.length === b.length && a.every(x => b.includes(x));
+  const out = [];
+  if (!prev || !same(main, prev.main)) for (const w of main) out.push(`<b style="--h:${cv(colors[w])}">${esc(shortName(w))}</b>`);
+  const ovKey = (l) => l.map(o => o.who + '|' + o.role);
+  if (!prev || !same(ovKey(ovs), ovKey(prev.ovs))) for (const o of ovs) out.push(`<b class="ov" style="--h:${cv(colors[o.who])}">${o.role ? o.role + ' ' : ''}${esc(shortName(o.who))}</b>`);
   return out.join('');
 }
 function wordsV(song, r, colors, opt = {}) {
@@ -536,7 +548,7 @@ function printSongV(p, song, n) {
   const secs = song.secs.map(sec => {
     const rows = sec.rows.filter(r => r.kind === 'bars' ? r.bars.some(x => x.length) : !isEmptyRow(r)); if (!rows.length && !sec.name) return '';
     const head = sec.name ? `<h2>${esc(sec.name)}${sec.rep > 1 ? `<span>×${sec.rep}</span>` : ''}${sec.ts ? `<span>${esc(sec.ts)}</span>` : ''}</h2>` : '';
-    return `<section class="pr-sec" style="--h:${cv(secCol(sec))}">${head}${note(sec.id)}${rows.map(r => `<div class="pr-row">${r.kind === 'bars' ? printBarsV(r) : `${printWordsV(song, r, colors)}<span class="pr-who">${lineWho(song, r, colors)}</span>`}${note(r.id)}</div>`).join('')}</section>`;
+    return `<section class="pr-sec${sec.name ? ' named' : ''}" style="--h:${cv(secCol(sec))}">${head}${note(sec.id)}${rows.map(r => `<div class="pr-row">${r.kind === 'bars' ? printBarsV(r) : `${printWordsV(song, r, colors)}<span class="pr-who">${lineWho(song, r, colors)}</span>`}${note(r.id)}</div>`).join('')}</section>`;
   }).join('');
   return `<article class="pr-song"><header class="pr-h"><div class="pr-top"><span class="pr-proj" style="--pc:${p.pc}"><i></i>${esc(p.name || (EN ? 'Untitled' : 'Sin nombre'))}${n ? ` · ${String(n).padStart(2, '0')}` : ''}</span>${notiLogoSvg('class="pr-logo"')}</div>
     <h1>${esc(titleOf(song) === 'Canción sin título' && EN ? 'Untitled song' : titleOf(song))}</h1>${meta.length ? `<p class="pr-meta">${meta.map(esc).join('<i>·</i>')}</p>` : ''}
