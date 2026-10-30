@@ -1150,6 +1150,12 @@ body { overscroll-behavior: none; -webkit-font-smoothing: antialiased }
 .signin .alt button { border: 0; background: none; padding: 2px; color: var(--dim); font: inherit; text-decoration: underline; text-underline-offset: 3px }
 .signin .alt button:hover { color: var(--ink) }
 .fwrap .fmeta { padding-right: 28px }
+/* people in a project: what an organiser can do with each */
+.edr .eda { display: flex; gap: 2px; margin-left: 4px }
+.sharep .edr .eda button { padding: 2px 6px; font-size: 0.78rem; color: var(--dim); width: auto }
+.sharep .edr .eda button:hover { color: var(--ink) }
+/* not invited yet: no way to start a project */
+.nocreate [data-newproj] { display: none !important }
 .st .br:not(.rp) .bars { padding-right: 0 }
 
 /* a project's colour is a little folder, wherever it shows */

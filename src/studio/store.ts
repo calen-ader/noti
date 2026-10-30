@@ -6,6 +6,9 @@ export type StudioStore = {
   project(id: string, doc: unknown, published: unknown, version: number, deleted: boolean): Promise<number | null>;
   song(projectId: string, id: string, doc: unknown, version: number, deleted: boolean): Promise<number | null>;
   profile(name: string, doc: unknown): Promise<number>;
+  // only the project's organisers can (the database checks); missing in the demo, where you organise everything
+  removeMember?(projectId: string, userId: string): Promise<void>;
+  setRole?(projectId: string, userId: string, role: 'edita' | 'organiza'): Promise<void>;
   // a project's files: kept in storage under <project>/<file>, opened through a link that lasts an hour
   upload(path: string, file: File): Promise<void>;
   fileUrl(path: string): Promise<string>;
@@ -13,21 +16,25 @@ export type StudioStore = {
 };
 
 export type StudioData = {
-  projects: { id: string; doc: unknown; published: unknown; version: number }[];
+  projects: { id: string; owner_id?: string; doc: unknown; published: unknown; version: number }[];
   songs: { project_id: string; id: string; doc: unknown; version: number }[];
   members: { project_id: string; user_id: string; name: string; role: string }[];
   profile: { name: string; doc: unknown } | null;
+  // Noti is by invitation: you can start projects once you have one or joined one with its link
+  canCreate: boolean;
 };
 
 export async function loadStudio(sb: SupabaseClient, userId: string): Promise<StudioData> {
-  const [projects, songs, members, profile] = await Promise.all([
-    sb.from('projects').select('id, doc, published, version').is('deleted_at', null).order('created_at'),
+  const [projects, songs, members, profile, canCreate] = await Promise.all([
+    sb.from('projects').select('id, owner_id, doc, published, version').is('deleted_at', null).order('created_at'),
     sb.from('project_songs').select('project_id, id, doc, version').is('deleted_at', null),
     sb.from('project_members').select('project_id, user_id, name, role'),
     sb.from('profiles').select('name, doc').eq('user_id', userId).maybeSingle(),
+    sb.rpc('can_create'),
   ]);
   for (const r of [projects, songs, members, profile]) if (r.error) throw r.error;
-  return { projects: projects.data ?? [], songs: songs.data ?? [], members: members.data ?? [], profile: profile.data ?? null };
+  // before the 0003 migration there's no can_create: everyone could start projects then
+  return { projects: projects.data ?? [], songs: songs.data ?? [], members: members.data ?? [], profile: profile.data ?? null, canCreate: canCreate.error ? true : canCreate.data === true };
 }
 
 export function supabaseStore(sb: SupabaseClient): StudioStore {
@@ -44,6 +51,12 @@ export function supabaseStore(sb: SupabaseClient): StudioStore {
     profile: async (name, doc) => {
       await call('save_profile', { p_name: name, p_doc: doc });
       return 1;
+    },
+    removeMember: async (projectId, userId) => {
+      await call('remove_member', { p_project: projectId, p_user: userId });
+    },
+    setRole: async (projectId, userId, role) => {
+      await call('set_member_role', { p_project: projectId, p_user: userId, p_role: role });
     },
     upload: async (path, file) => {
       const { error } = await sb.storage.from('files').upload(path, file, { contentType: file.type, upsert: false });
@@ -75,7 +88,7 @@ const writeLocal = (db: LocalDb) => localStorage.setItem(LOCAL, JSON.stringify(d
 
 export function loadLocal(): StudioData {
   const db = readLocal();
-  return { projects: db.projects.filter((p) => !p.deleted), songs: db.songs.filter((s) => !s.deleted), members: [], profile: db.profile };
+  return { projects: db.projects.filter((p) => !p.deleted), songs: db.songs.filter((s) => !s.deleted), members: [], profile: db.profile, canCreate: true };
 }
 
 export function localStore(): StudioStore {

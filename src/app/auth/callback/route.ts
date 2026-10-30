@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { safeNext } from '@/lib/next';
 import { supabaseServer } from '@/lib/supabase/server';
 
 // The emailed sign-in link lands here with a one-time code, and goes on to where the person was headed
@@ -6,8 +7,13 @@ import { supabaseServer } from '@/lib/supabase/server';
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const code = url.searchParams.get('code');
-  const next = decodeURIComponent(request.cookies.get('noti-next')?.value ?? '');
-  const to = next.startsWith('/') && !next.startsWith('//') ? next : '/estudio';
+  let next = '';
+  try {
+    next = decodeURIComponent(request.cookies.get('noti-next')?.value ?? '');
+  } catch {
+    // a damaged cookie just means going to the studio
+  }
+  const to = safeNext(next) ?? '/estudio';
   if (code) {
     const supabase = await supabaseServer();
     const { error } = await supabase.auth.exchangeCodeForSession(code);

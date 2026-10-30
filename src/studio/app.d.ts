@@ -10,6 +10,8 @@ export type Boot = {
   me?: { id: string; email: string; name: string } | null;
   data?: unknown;
   open?: string | null;
+  // came from an invite link, so creating an account is offered on the sign-in screen
+  invited?: boolean;
   store?: StudioStore | null;
   signIn?: (email: string) => Promise<AuthResult>;
   signInPassword?: (email: string, password: string) => Promise<AuthResult>;
