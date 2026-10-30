@@ -1260,6 +1260,7 @@ button.chip.addc:hover, .pv:hover .chip.addc { color: var(--ink); box-shadow: in
 .pr-cover h1 { font-size: 46pt; line-height: 0.98; font-weight: 800; letter-spacing: -0.04em; text-wrap: balance; max-width: 150mm }
 .pr-cover p { margin-top: 5mm !important; font-size: 11pt; font-weight: 600; color: #5f6066 }
 .pr-band { display: block; height: 7mm; background: var(--pc); margin-top: 10mm }
+.pr-pname { font-size: 30pt; line-height: 1; font-weight: 800; letter-spacing: -0.04em; text-wrap: balance; margin-bottom: 9mm !important }
 .pr-index h2 { font-size: 9pt; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; padding-bottom: 3mm; border-bottom: 1.5px solid #202124 }
 .pr-index ol { list-style: none; margin: 0; padding: 0 }
 .pr-index li { display: grid; grid-template-columns: 11mm minmax(0, 1fr) auto; align-items: baseline; padding: 2.4mm 0; border-bottom: 1px solid #dedcd6 }
